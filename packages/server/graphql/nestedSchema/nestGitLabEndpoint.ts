@@ -3,10 +3,9 @@ import nestGraphQLEndpoint from 'nest-graphql-endpoint/lib/nestGraphQLEndpoint'
 import {
   EndpointExecutionResult,
   Executor,
-  NestedSource,
-  NestGraphQLEndpointParams
+  NestGraphQLEndpointParams,
+  NestedSource
 } from 'nest-graphql-endpoint/lib/types'
-import fetch from 'node-fetch'
 
 const defaultExecutor: Executor<{
   accessToken: string

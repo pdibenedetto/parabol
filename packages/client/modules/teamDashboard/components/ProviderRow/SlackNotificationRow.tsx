@@ -1,17 +1,16 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {useFragment} from 'react-relay'
+import {
+  SlackNotificationEventEnum,
+  SlackNotificationRow_viewer$key
+} from '../../../../__generated__/SlackNotificationRow_viewer.graphql'
 import StyledError from '../../../../components/StyledError'
 import Toggle from '../../../../components/Toggle/Toggle'
 import useAtmosphere from '../../../../hooks/useAtmosphere'
 import useMutationProps from '../../../../hooks/useMutationProps'
 import SetSlackNotificationMutation from '../../../../mutations/SetSlackNotificationMutation'
 import {MeetingLabels} from '../../../../types/constEnums'
-import {
-  SlackNotificationEventEnum,
-  SlackNotificationRow_viewer$key
-} from '../../../../__generated__/SlackNotificationRow_viewer.graphql'
 
 interface Props {
   event: SlackNotificationEventEnum
@@ -24,7 +23,9 @@ const labelLookup = {
   meetingEnd: 'Meeting End',
   meetingStart: 'Meeting Start',
   MEETING_STAGE_TIME_LIMIT_END: `Meeting ${MeetingLabels.TIME_LIMIT} Ended`,
-  MEETING_STAGE_TIME_LIMIT_START: `Meeting ${MeetingLabels.TIME_LIMIT} Started`
+  MEETING_STAGE_TIME_LIMIT_START: `Meeting ${MeetingLabels.TIME_LIMIT} Started`,
+  TOPIC_SHARED: `Topic Shared`,
+  STANDUP_RESPONSE_SUBMITTED: 'Standup Response Submitted'
 } as Record<SlackNotificationEventEnum, string>
 
 const Row = styled('div')({

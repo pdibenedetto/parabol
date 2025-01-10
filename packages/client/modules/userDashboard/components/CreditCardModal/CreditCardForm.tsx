@@ -1,16 +1,17 @@
 import styled from '@emotion/styled'
-import React, {useEffect, useState} from 'react'
+import * as React from 'react'
+import {useEffect, useState} from 'react'
 import PlainButton from '../../../../components/PlainButton/PlainButton'
 import PrimaryButton from '../../../../components/PrimaryButton'
 import UpgradeCreditCardFormField from '../../../../components/UpgradeCreditCardFormField'
 import UpgradeCreditCardNumberFormField from '../../../../components/UpgradeCreditCardNumberFormField'
 import useAtmosphere from '../../../../hooks/useAtmosphere'
+import useClientSideTrack from '../../../../hooks/useClientSideTrack'
 import useForm from '../../../../hooks/useForm'
 import useMutationProps from '../../../../hooks/useMutationProps'
 import useScript from '../../../../hooks/useScript'
-import useSegmentTrack from '../../../../hooks/useSegmentTrack'
-import UpdateCreditCardMutation from '../../../../mutations/UpdateCreditCardMutation'
-import UpgradeToTeamTierMutation from '../../../../mutations/UpgradeToTeamTierMutation'
+import OldUpdateCreditCardMutation from '../../../../mutations/OldUpdateCreditCardMutation'
+import OldUpgradeToTeamTierMutation from '../../../../mutations/OldUpgradeToTeamTierMutation'
 import {CompletedHandler} from '../../../../types/relayMutations'
 import StripeClientManager, {StripeError} from '../../../../utils/StripeClientManager'
 import CreditCardErrorLine from './CreditCardErrorLine'
@@ -102,7 +103,7 @@ const CreditCardForm = (props: Props) => {
       validate: stripeClientManager.validateExpiry
     }
   })
-  useSegmentTrack('Credit Card Modal Opened', {actionType})
+  useClientSideTrack('Credit Card Modal Opened', {actionType})
 
   useEffect(() => {
     if (isStripeLoaded) {
@@ -144,13 +145,13 @@ const CreditCardForm = (props: Props) => {
     }
 
     if (actionType === 'update') {
-      UpdateCreditCardMutation(
+      OldUpdateCreditCardMutation(
         atmosphere,
         {orgId, stripeToken},
         {onError, onCompleted: handleCompleted}
       )
     } else {
-      UpgradeToTeamTierMutation(
+      OldUpgradeToTeamTierMutation(
         atmosphere,
         {orgId, stripeToken},
         {onError, onCompleted: handleCompleted}

@@ -1,6 +1,6 @@
-import getRethink from '../../../database/rethinkDriver'
+import removeTeamsLimitObjects from '../../../billing/helpers/removeTeamsLimitObjects'
+import getKysely from '../../../postgres/getKysely'
 import {getUserByEmail} from '../../../postgres/queries/getUsersByEmails'
-import updateTeamByOrgId from '../../../postgres/queries/updateTeamByOrgId'
 import IUser from '../../../postgres/types/IUser'
 import {analytics} from '../../../utils/analytics/analytics'
 import {fromEpochSeconds} from '../../../utils/epochTime'
@@ -17,7 +17,7 @@ const getBillingLeaderUser = async (
   orgId: string,
   dataLoader: DataLoaderWorker
 ) => {
-  const r = await getRethink()
+  const pg = getKysely()
   if (email) {
     const user = await getUserByEmail(email)
     if (!user) {
@@ -30,17 +30,21 @@ const getBillingLeaderUser = async (
     if (!organizationUser) {
       throw new Error('Email not associated with a user on that org')
     }
-    await r
-      .table('OrganizationUser')
-      .getAll(userId, {index: 'userId'})
-      .filter({removedAt: null, orgId})
-      .update({role: 'BILLING_LEADER'})
-      .run()
+    if (organizationUser.role !== 'ORG_ADMIN') {
+      await pg
+        .updateTable('OrganizationUser')
+        .set({role: 'BILLING_LEADER'})
+        .where('userId', '=', userId)
+        .where('orgId', '=', orgId)
+        .where('removedAt', 'is', null)
+        .execute()
+    }
     return user
   }
   const organizationUsers = await dataLoader.get('organizationUsersByOrgId').load(orgId)
   const billingLeaders = organizationUsers.filter(
-    (organizationUser) => organizationUser.role === 'BILLING_LEADER'
+    (organizationUser) =>
+      organizationUser.role === 'BILLING_LEADER' || organizationUser.role === 'ORG_ADMIN'
   )
 
   const billingLeaderUserIds = billingLeaders.map(({userId}) => userId)
@@ -55,7 +59,7 @@ const draftEnterpriseInvoice: MutationResolvers['draftEnterpriseInvoice'] = asyn
   {orgId, quantity, email, apEmail, plan},
   {dataLoader}
 ) => {
-  const r = await getRethink()
+  const pg = getKysely()
   const now = new Date()
 
   // VALIDATION
@@ -96,35 +100,50 @@ const draftEnterpriseInvoice: MutationResolvers['draftEnterpriseInvoice'] = asyn
   if (!stripeId) {
     // create the customer
     const customer = await manager.createCustomer(orgId, apEmail || user.email)
-    await r.table('Organization').get(orgId).update({stripeId: customer.id}).run()
+    if (customer instanceof Error) throw customer
+    await getKysely()
+      .updateTable('Organization')
+      .set({stripeId: customer.id})
+      .where('id', '=', orgId)
+      .execute()
     customerId = customer.id
   } else {
     customerId = stripeId
   }
 
-  const subscription = await manager.createEnterpriseSubscription(customerId, orgId, quantity, plan)
+  const subscription = await manager.createEnterpriseSubscription(
+    customerId,
+    orgId,
+    quantity,
+    plan ?? undefined
+  )
 
   await Promise.all([
-    r({
-      updatedOrg: r
-        .table('Organization')
-        .get(orgId)
-        .update({
-          periodEnd: fromEpochSeconds(subscription.current_period_end),
-          periodStart: fromEpochSeconds(subscription.current_period_start),
-          stripeSubscriptionId: subscription.id,
-          tier: 'enterprise',
-          updatedAt: now
-        })
-    }).run(),
-    updateTeamByOrgId(
-      {
+    pg
+      .updateTable('Organization')
+      .set({
+        periodEnd: fromEpochSeconds(subscription.current_period_end),
+        periodStart: fromEpochSeconds(subscription.current_period_start),
+        stripeSubscriptionId: subscription.id,
+        tier: 'enterprise',
+        tierLimitExceededAt: null,
+        scheduledLockAt: null,
+        lockedAt: null,
+        updatedAt: now,
+        trialStartDate: null
+      })
+      .where('id', '=', orgId)
+      .execute(),
+    pg
+      .updateTable('Team')
+      .set({
         isPaid: true,
         tier: 'enterprise',
-        updatedAt: now
-      },
-      orgId
-    )
+        trialStartDate: null
+      })
+      .where('orgId', '=', orgId)
+      .execute(),
+    removeTeamsLimitObjects(orgId, dataLoader)
   ])
 
   await Promise.all([
@@ -132,10 +151,11 @@ const draftEnterpriseInvoice: MutationResolvers['draftEnterpriseInvoice'] = asyn
     setTierForOrgUsers(orgId),
     hideConversionModal(orgId, dataLoader)
   ])
-  analytics.organizationUpgraded(user.id, {
+  analytics.organizationUpgraded(user, {
     orgId,
-    domain: org.activeDomain,
+    domain: org.activeDomain || undefined,
     orgName: org.name,
+    isTrial: !!org.trialStartDate,
     oldTier: 'starter',
     newTier: 'enterprise',
     billingLeaderEmail: user.email

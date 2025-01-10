@@ -1,10 +1,10 @@
 import {GraphQLID, GraphQLInt, GraphQLList, GraphQLNonNull, GraphQLObjectType} from 'graphql'
 import toTeamMemberId from 'parabol-client/utils/relay/toTeamMemberId'
+import {Logger} from '../../utils/Logger'
 import {getUserId} from '../../utils/authorization'
 import {GQLContext} from '../graphql'
-import NewMeeting, {newMeetingFields} from './NewMeeting'
+import NewMeeting from './NewMeeting'
 import PokerMeetingMember from './PokerMeetingMember'
-import PokerMeetingSettings from './PokerMeetingSettings'
 import Task from './Task'
 
 const PokerMeeting = new GraphQLObjectType<any, GQLContext>({
@@ -12,7 +12,6 @@ const PokerMeeting = new GraphQLObjectType<any, GQLContext>({
   interfaces: () => [NewMeeting],
   description: 'A Poker meeting',
   fields: () => ({
-    ...newMeetingFields(),
     commentCount: {
       type: new GraphQLNonNull(GraphQLInt),
       description: 'The number of comments generated in the meeting',
@@ -30,13 +29,6 @@ const PokerMeeting = new GraphQLObjectType<any, GQLContext>({
       description: 'The number of stories scored during a meeting',
       resolve: ({storyCount}) => storyCount || 0
     },
-    settings: {
-      type: new GraphQLNonNull(PokerMeetingSettings),
-      description: 'The settings that govern the Poker meeting',
-      resolve: async ({teamId}, _args: unknown, {dataLoader}) => {
-        return dataLoader.get('meetingSettingsByType').load({teamId, meetingType: 'poker'})
-      }
-    },
     story: {
       type: Task,
       description: 'A single story created in a Sprint Poker meeting',
@@ -46,9 +38,9 @@ const PokerMeeting = new GraphQLObjectType<any, GQLContext>({
         }
       },
       resolve: async ({id: meetingId}, {storyId: taskId}, {dataLoader}) => {
-        const task = await dataLoader.get('tasks').load(taskId)
+        const task = await dataLoader.get('tasks').loadNonNull(taskId)
         if (task.meetingId !== meetingId) {
-          console.log('naughty storyId supplied to PokerMeeting')
+          Logger.log('naughty storyId supplied to PokerMeeting')
           return null
         }
         return task

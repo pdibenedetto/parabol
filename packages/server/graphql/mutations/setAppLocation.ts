@@ -52,12 +52,12 @@ export default {
       const connectedSocket = connections[connectedSocketIdx]!
 
       // RESOLUTION
-      const {lastSeenAtURL, socketId, serverId} = connectedSocket
+      const {lastSeenAtURL, socketId, socketInstanceId} = connectedSocket
       const data = {userId: viewerId}
       if (lastSeenAtURL !== location) {
         const updatedConnection = {
           socketId,
-          serverId,
+          socketInstanceId,
           lastSeenAtURL: location
         }
         const [lastMeetingId, nextMeetingId] = [lastSeenAtURL, location].map((url) => {

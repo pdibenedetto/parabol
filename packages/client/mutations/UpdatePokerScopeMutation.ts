@@ -1,22 +1,20 @@
 import graphql from 'babel-plugin-relay/macro'
-import {stateToHTML} from 'draft-js-export-html'
 import {commitMutation} from 'react-relay'
 import GitLabIssueId from '~/shared/gqlIds/GitLabIssueId'
 //import AzureDevOpsIssueId from '~/shared/gqlIds/AzureDevOpsIssueId'
+import {generateHTML} from '@tiptap/core'
+import {UpdatePokerScopeMutation as TUpdatePokerScopeMutation} from '../__generated__/UpdatePokerScopeMutation.graphql'
 import GitHubIssueId from '../shared/gqlIds/GitHubIssueId'
 import JiraIssueId from '../shared/gqlIds/JiraIssueId'
+import {convertTipTapTaskContent} from '../shared/tiptap/convertTipTapTaskContent'
+import {serverTipTapExtensions} from '../shared/tiptap/serverTipTapExtensions'
+import {splitTipTapContent} from '../shared/tiptap/splitTipTapContent'
 import {PALETTE} from '../styles/paletteV3'
 import {BaseLocalHandlers, StandardMutation} from '../types/relayMutations'
-import convertToTaskContent from '../utils/draftjs/convertToTaskContent'
-import splitDraftContent from '../utils/draftjs/splitDraftContent'
 import getSearchQueryFromMeeting from '../utils/getSearchQueryFromMeeting'
 import clientTempId from '../utils/relay/clientTempId'
 import createProxyRecord from '../utils/relay/createProxyRecord'
-import {
-  UpdatePokerScopeMutation as TUpdatePokerScopeMutation,
-  UpdatePokerScopeMutationResponse
-} from '../__generated__/UpdatePokerScopeMutation.graphql'
-import SendClientSegmentEventMutation from './SendClientSegmentEventMutation'
+import SendClientSideEvent from '../utils/SendClientSideEvent'
 
 graphql`
   fragment UpdatePokerScopeMutation_meeting on UpdatePokerScopeSuccess {
@@ -101,7 +99,7 @@ const mutation = graphql`
 `
 
 export type PokerScopeMeeting = NonNullable<
-  UpdatePokerScopeMutationResponse['updatePokerScope']['meeting']
+  TUpdatePokerScopeMutation['response']['updatePokerScope']['meeting']
 >
 
 interface Handlers extends BaseLocalHandlers {
@@ -172,8 +170,8 @@ const UpdatePokerScopeMutation: StandardMutation<TUpdatePokerScopeMutation, Hand
 
           // create a task if it doesn't exist
           const plaintextContent = contents[idx] ?? ''
-          const content = convertToTaskContent(plaintextContent)
-          const {title, contentState} = splitDraftContent(content)
+          const content = convertTipTapTaskContent(plaintextContent)
+          const {title, bodyContent} = splitTipTapContent(JSON.parse(content))
           const optimisticTask = createProxyRecord(store, 'Task', {
             createdBy: viewerId,
             plaintextContent,
@@ -191,7 +189,7 @@ const UpdatePokerScopeMutation: StandardMutation<TUpdatePokerScopeMutation, Hand
             .setLinkedRecords([], 'editors')
             .setLinkedRecord(team!, 'team')
           if (service === 'jira') {
-            const descriptionHTML = stateToHTML(contentState)
+            const descriptionHTML = generateHTML(bodyContent, serverTipTapExtensions)
             const {cloudId, issueKey, projectKey} = JiraIssueId.split(serviceTaskId)
             const optimisticTaskIntegration = createProxyRecord(store, 'JiraIssue', {
               teamId,
@@ -221,7 +219,7 @@ const UpdatePokerScopeMutation: StandardMutation<TUpdatePokerScopeMutation, Hand
             })
             optimisticTask.setLinkedRecord(optimisticTaskIntegration, 'integration')
           } else if (service === 'github') {
-            const bodyHTML = stateToHTML(contentState)
+            const bodyHTML = generateHTML(bodyContent, serverTipTapExtensions)
             const {issueNumber, nameWithOwner, repoName, repoOwner} =
               GitHubIssueId.split(serviceTaskId)
             const repository = createProxyRecord(store, '_xGitHubRepository', {
@@ -297,7 +295,7 @@ const UpdatePokerScopeMutation: StandardMutation<TUpdatePokerScopeMutation, Hand
       const searchQuery = getSearchQueryFromMeeting(meeting, service)
       if (!searchQuery) return
       const {searchQueryString, searchQueryFilters} = searchQuery
-      SendClientSegmentEventMutation(atmosphere, 'Updated Poker Scope', {
+      SendClientSideEvent(atmosphere, 'Updated Poker Scope', {
         meetingId,
         service,
         action,

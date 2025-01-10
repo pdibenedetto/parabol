@@ -1,11 +1,11 @@
 import {GraphQLFloat, GraphQLID, GraphQLNonNull} from 'graphql'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
 import findStageById from 'parabol-client/utils/meetings/findStageById'
-import getRethink from '../../database/rethinkDriver'
 import ScheduledJobMeetingStageTimeLimit from '../../database/types/ScheduledJobMetingStageTimeLimit'
+import getKysely from '../../postgres/getKysely'
+import {analytics} from '../../utils/analytics/analytics'
 import {getUserId, isTeamMember} from '../../utils/authorization'
 import publish from '../../utils/publish'
-import segmentIo from '../../utils/segmentIo'
 import standardError from '../../utils/standardError'
 import {GQLContext} from '../graphql'
 import GraphQLISO8601Type from '../types/GraphQLISO8601Type'
@@ -44,14 +44,17 @@ export default {
     }: {scheduledEndTime: Date | null; meetingId: string; timeRemaining: number | null},
     {authToken, dataLoader, socketId: mutatorId}: GQLContext
   ) {
-    const r = await getRethink()
+    const pg = getKysely()
     const operationId = dataLoader.share()
     const subOptions = {mutatorId, operationId}
     const viewerId = getUserId(authToken)
     const now = new Date()
 
     // AUTH
-    const meeting = await dataLoader.get('newMeetings').load(meetingId)
+    const [meeting, viewer] = await Promise.all([
+      dataLoader.get('newMeetings').loadNonNull(meetingId),
+      dataLoader.get('users').loadNonNull(viewerId)
+    ])
     const {endedAt, facilitatorStageId, facilitatorUserId, phases, teamId} = meeting
     if (!isTeamMember(authToken, teamId)) {
       return standardError(new Error('Team not found'), {userId: viewerId})
@@ -87,12 +90,13 @@ export default {
           ? new Date(now.getTime() + timeRemaining - AVG_PING)
           : newScheduledEndTime
       } else {
+        const pg = getKysely()
         stage.isAsync = true
         stage.scheduledEndTime = newScheduledEndTime
-        await r
-          .table('ScheduledJob')
-          .insert(new ScheduledJobMeetingStageTimeLimit(newScheduledEndTime, meetingId))
-          .run()
+        await pg
+          .insertInto('ScheduledJob')
+          .values(new ScheduledJobMeetingStageTimeLimit(newScheduledEndTime, meetingId))
+          .execute()
         IntegrationNotifier.startTimeLimit(dataLoader, newScheduledEndTime, meetingId, teamId)
       }
     } else {
@@ -102,34 +106,26 @@ export default {
     }
 
     // RESOLUTION
-    await r
-      .table('NewMeeting')
-      .get(meetingId)
-      .update({
-        phases,
-        updatedAt: now
-      })
-      .run()
-
+    await pg
+      .updateTable('NewMeeting')
+      .set({phases: JSON.stringify(phases)})
+      .where('id', '=', meetingId)
+      .execute()
     const data = {meetingId, stageId: facilitatorStageId}
     const {isAsync, phaseType, startAt, viewCount} = stage
     const stoppedOrStarted = newScheduledEndTime ? `Meeting Timer Started` : `Meeting Timer Stopped`
     const eventName =
       scheduledEndTime && newScheduledEndTime ? `Meeting Timer Updated` : stoppedOrStarted
     publish(SubscriptionChannel.MEETING, meetingId, 'SetStageTimerPayload', data, subOptions)
-    segmentIo.track({
-      userId: viewerId,
-      event: eventName,
-      properties: {
-        isAsync,
-        meetingId,
-        newScheduledEndTime,
-        phaseType,
-        previousScheduledEndTime: scheduledEndTime,
-        stageStartAt: startAt,
-        timeRemaining,
-        viewCount
-      }
+    analytics.meetingTimerEvent(viewer, eventName, {
+      meetingId,
+      phaseType,
+      viewCount,
+      isAsync,
+      newScheduledEndTime,
+      timeRemaining,
+      previousScheduledEndTime: scheduledEndTime,
+      stageStartAt: startAt
     })
     return data
   }

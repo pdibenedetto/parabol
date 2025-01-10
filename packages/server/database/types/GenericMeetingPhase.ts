@@ -7,6 +7,7 @@ export type NewMeetingPhaseTypeEnum =
   | 'SUMMARY'
   | 'agendaitems'
   | 'checkin'
+  | 'TEAM_HEALTH'
   | 'discuss'
   | 'firstcall'
   | 'group'
@@ -20,7 +21,10 @@ export type NewMeetingPhaseTypeEnum =
 export default class GenericMeetingPhase {
   id = generateUID()
   stages: GenericMeetingStage[]
-  constructor(public phaseType: NewMeetingPhaseTypeEnum, durations?: number[] | undefined) {
+  constructor(
+    public phaseType: NewMeetingPhaseTypeEnum,
+    durations?: number[] | undefined
+  ) {
     this.stages = [new GenericMeetingStage({phaseType, durations})]
   }
 }

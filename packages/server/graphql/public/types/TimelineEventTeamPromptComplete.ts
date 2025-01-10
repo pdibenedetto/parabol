@@ -1,5 +1,5 @@
 import TimelineEventTeamPromptCompleteModel from '../../../database/types/TimelineEventTeamPromptComplete'
-import {Maybe, ResolversTypes, TimelineEventTeamPromptCompleteResolvers} from '../resolverTypes'
+import {TimelineEventTeamPromptCompleteResolvers} from '../resolverTypes'
 import {timelineEventInterfaceResolvers} from './TimelineEvent'
 
 export type TimelineEventTeamPromptCompleteSource = Pick<
@@ -11,10 +11,9 @@ const TimelineEventTeamPromptComplete: TimelineEventTeamPromptCompleteResolvers 
   ...timelineEventInterfaceResolvers(),
   __isTypeOf: ({type}) => type === 'TEAM_PROMPT_COMPLETE',
   meeting: async ({meetingId}, _args, {dataLoader}) => {
-    const meeting = await dataLoader.get('newMeetings').load(meetingId)
-    return (meeting.meetingType !== 'teamPrompt' ? null : meeting) as Maybe<
-      ResolversTypes['TeamPromptMeeting']
-    >
+    const meeting = await dataLoader.get('newMeetings').loadNonNull(meetingId)
+    if (meeting.meetingType !== 'teamPrompt') throw new Error('Invalid meetingId')
+    return meeting
   },
   team: ({teamId}, _args: unknown, {dataLoader}) => {
     return dataLoader.get('teams').loadNonNull(teamId)

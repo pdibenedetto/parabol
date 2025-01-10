@@ -1,7 +1,6 @@
 import styled from '@emotion/styled'
 import {Event} from '@mui/icons-material'
 import ms from 'ms'
-import React from 'react'
 import {DayModifiers, DayPicker} from 'react-day-picker'
 import {MenuPosition} from '../hooks/useCoords'
 import useMenu from '../hooks/useMenu'
@@ -47,7 +46,6 @@ const StageTimerModalEndTimeDate = (props: Props) => {
     originRef
   } = useMenu<HTMLDivElement>(MenuPosition.LOWER_LEFT, {
     id: 'StageTimerEndTimePicker',
-    parentId: 'StageTimerModal',
     isDropdown: true
   })
   const handleDayClick = (day: Date, {disabled, selected}: DayModifiers) => {

@@ -1,20 +1,22 @@
 import styled from '@emotion/styled'
 import {Cancel as CancelIcon} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import React, {FormEvent, useEffect, useRef, useState} from 'react'
+import * as React from 'react'
+import {FormEvent, useEffect, useRef, useState} from 'react'
 import {useFragment} from 'react-relay'
 import useAtmosphere from '~/hooks/useAtmosphere'
 import useMutationProps from '~/hooks/useMutationProps'
 import {PALETTE} from '~/styles/paletteV3'
+import {
+  NewTemplateScaleValueLabelInput_scale$data,
+  NewTemplateScaleValueLabelInput_scale$key
+} from '../../../__generated__/NewTemplateScaleValueLabelInput_scale.graphql'
 import useScrollIntoView from '../../../hooks/useScrollIntoVIew'
 import AddPokerTemplateScaleValueMutation from '../../../mutations/AddPokerTemplateScaleValueMutation'
 import palettePickerOptions from '../../../styles/palettePickerOptions'
+import {Threshold} from '../../../types/constEnums'
 import isSpecialPokerLabel from '../../../utils/isSpecialPokerLabel'
 import Legitity from '../../../validation/Legitity'
-import {
-  NewTemplateScaleValueLabelInput_scale$key,
-  NewTemplateScaleValueLabelInput_scale
-} from '../../../__generated__/NewTemplateScaleValueLabelInput_scale.graphql'
 import EditableTemplateScaleValueColor from './EditableTemplateScaleValueColor'
 
 const Form = styled('form')({
@@ -67,7 +69,7 @@ const RemoveScaleValueIcon = styled('div')({
   padding: 0
 })
 
-const predictNextLabel = (values: NewTemplateScaleValueLabelInput_scale['values']) => {
+const predictNextLabel = (values: NewTemplateScaleValueLabelInput_scale$data['values']) => {
   const existingLabels = values
     .map(({label}) => label)
     .filter((label) => !isSpecialPokerLabel(label))
@@ -121,7 +123,10 @@ const NewTemplateScaleValueLabelInput = (props: Props) => {
     return new Legitity(value)
       .trim()
       .required('Please enter a value')
-      .max(2, 'Value cannot be longer than 2 characters')
+      .max(
+        Threshold.POKER_SCALE_VALUE_MAX_LENGTH,
+        `Value cannot be longer than ${Threshold.POKER_SCALE_VALUE_MAX_LENGTH} characters`
+      )
       .test((mVal) => {
         if (!mVal) return undefined
         const isDupe = values.find(

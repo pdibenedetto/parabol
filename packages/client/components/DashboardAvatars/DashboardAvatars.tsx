@@ -1,18 +1,18 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useMemo} from 'react'
+import {useMemo} from 'react'
 import {commitLocalUpdate, useFragment} from 'react-relay'
 import {Breakpoint, ElementHeight, ElementWidth} from '~/types/constEnums'
 import fromTeamMemberId from '~/utils/relay/fromTeamMemberId'
+import {
+  DashboardAvatars_team$data,
+  DashboardAvatars_team$key
+} from '../../__generated__/DashboardAvatars_team.graphql'
 import useAtmosphere from '../../hooks/useAtmosphere'
 import useBreakpoint from '../../hooks/useBreakpoint'
 import useMutationProps from '../../hooks/useMutationProps'
 import ToggleTeamDrawerMutation from '../../mutations/ToggleTeamDrawerMutation'
 import {PALETTE} from '../../styles/paletteV3'
-import {
-  DashboardAvatars_team$key,
-  DashboardAvatars_team
-} from '../../__generated__/DashboardAvatars_team.graphql'
 import ErrorBoundary from '../ErrorBoundary'
 import PlainButton from '../PlainButton/PlainButton'
 import DashboardAvatar from './DashboardAvatar'
@@ -74,7 +74,7 @@ interface Props {
   team: DashboardAvatars_team$key
 }
 
-type Avatar = DashboardAvatars_team['teamMembers'][0]
+type Avatar = DashboardAvatars_team$data['teamMembers'][0]
 
 const DashboardAvatars = (props: Props) => {
   const {team: teamRef} = props

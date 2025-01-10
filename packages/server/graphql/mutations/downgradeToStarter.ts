@@ -1,11 +1,12 @@
-import {GraphQLID, GraphQLNonNull} from 'graphql'
+import {GraphQLID, GraphQLList, GraphQLNonNull, GraphQLString} from 'graphql'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
-import getRethink from '../../database/rethinkDriver'
 import {getUserId, isSuperUser, isUserBillingLeader} from '../../utils/authorization'
 import publish from '../../utils/publish'
 import standardError from '../../utils/standardError'
 import {GQLContext} from '../graphql'
+import {ReasonToDowngradeEnum as TReasonToDowngradeEnum} from '../public/resolverTypes'
 import DowngradeToStarterPayload from '../types/DowngradeToStarterPayload'
+import ReasonToDowngradeEnum from '../types/ReasonToDowngrade'
 import resolveDowngradeToStarter from './helpers/resolveDowngradeToStarter'
 
 export default {
@@ -15,27 +16,46 @@ export default {
     orgId: {
       type: new GraphQLNonNull(GraphQLID),
       description: 'the org requesting the upgrade'
+    },
+    reasonsForLeaving: {
+      type: new GraphQLList(ReasonToDowngradeEnum),
+      description: 'the reasons the user is leaving'
+    },
+    otherTool: {
+      type: GraphQLString,
+      description:
+        'the name of the tool they are moving to. only required if anotherTool is selected as a reason to downgrade'
     }
   },
   async resolve(
     _source: unknown,
-    {orgId}: {orgId: string},
+    {
+      orgId,
+      reasonsForLeaving,
+      otherTool
+    }: {orgId: string; reasonsForLeaving?: TReasonToDowngradeEnum[]; otherTool?: string},
     {authToken, dataLoader, socketId: mutatorId}: GQLContext
   ) {
-    const r = await getRethink()
     const operationId = dataLoader.share()
     const subOptions = {mutatorId, operationId}
 
     // AUTH
     const viewerId = getUserId(authToken)
-    if (!isSuperUser(authToken)) {
-      if (!(await isUserBillingLeader(viewerId, orgId, dataLoader))) {
-        return standardError(new Error('Not organization leader'), {userId: viewerId})
-      }
+    const [isBillingLeader, viewer] = await Promise.all([
+      isUserBillingLeader(viewerId, orgId, dataLoader),
+      dataLoader.get('users').loadNonNull(viewerId)
+    ])
+    if (!isSuperUser(authToken) && !isBillingLeader) {
+      return standardError(new Error('Not organization leader'), {userId: viewerId})
     }
 
     // VALIDATION
-    const {stripeSubscriptionId, tier} = await r.table('Organization').get(orgId).run()
+    if (otherTool && otherTool?.length > 100) {
+      return standardError(new Error('Other tool name is too long'), {userId: viewerId})
+    }
+
+    const {stripeSubscriptionId, tier} = await dataLoader.get('organizations').loadNonNull(orgId)
+    dataLoader.get('organizations').clear(orgId)
 
     if (tier === 'starter') {
       return standardError(new Error('Already on free tier'), {userId: viewerId})
@@ -43,7 +63,14 @@ export default {
 
     // RESOLUTION
     // if they downgrade & are re-upgrading, they'll already have a stripeId
-    await resolveDowngradeToStarter(orgId, stripeSubscriptionId!, viewerId)
+    await resolveDowngradeToStarter(
+      orgId,
+      stripeSubscriptionId!,
+      viewer,
+      dataLoader,
+      reasonsForLeaving,
+      otherTool
+    )
     const teams = await dataLoader.get('teamsByOrgIds').load(orgId)
     const teamIds = teams.map(({id}) => id)
     const data = {orgId, teamIds}

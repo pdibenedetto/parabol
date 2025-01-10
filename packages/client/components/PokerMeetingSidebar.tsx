@@ -1,11 +1,11 @@
 import graphql from 'babel-plugin-relay/macro'
-import React, {Fragment} from 'react'
+import {Fragment} from 'react'
 import {useFragment} from 'react-relay'
-import useRouter from '~/hooks/useRouter'
 import {
   NewMeetingPhaseTypeEnum,
   PokerMeetingSidebar_meeting$key
 } from '~/__generated__/PokerMeetingSidebar_meeting.graphql'
+import useRouter from '~/hooks/useRouter'
 import useAtmosphere from '../hooks/useAtmosphere'
 import useGotoStageId from '../hooks/useGotoStageId'
 import getSidebarItemStage from '../utils/getSidebarItemStage'
@@ -35,9 +35,6 @@ const PokerMeetingSidebar = (props: Props) => {
         ...PokerSidebarPhaseListItemChildren_meeting
         ...NewMeetingSidebar_meeting
         showSidebar
-        settings {
-          phaseTypes
-        }
         id
         endedAt
         facilitatorUserId
@@ -71,10 +68,8 @@ const PokerMeetingSidebar = (props: Props) => {
     facilitatorStageId,
     localPhase,
     localStage,
-    phases,
-    settings
+    phases
   } = meeting
-  const {phaseTypes} = settings
   const localPhaseType = localPhase ? localPhase.phaseType : ''
   const facilitatorStageRes = findStageById(phases, facilitatorStageId)
   const facilitatorPhaseType = facilitatorStageRes ? facilitatorStageRes.phase.phaseType : ''
@@ -88,7 +83,7 @@ const PokerMeetingSidebar = (props: Props) => {
       meeting={meeting}
     >
       <MeetingNavList>
-        {phaseTypes.map((phaseType) => {
+        {phases.map(({phaseType}) => {
           const itemStage = getSidebarItemStage(phaseType, phases, facilitatorStageId)
           const {
             id: itemStageId = '',
@@ -97,7 +92,9 @@ const PokerMeetingSidebar = (props: Props) => {
           } = itemStage || {}
           const canNavigate = isViewerFacilitator ? isNavigableByFacilitator : isNavigable
           const handleClick = () => {
-            gotoStageId(itemStageId).catch()
+            gotoStageId(itemStageId).catch(() => {
+              /*ignore*/
+            })
             handleMenuClick()
           }
           const estimatePhase = phases.find((phase) => {

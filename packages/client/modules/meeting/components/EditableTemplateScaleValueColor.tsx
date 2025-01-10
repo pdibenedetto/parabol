@@ -1,11 +1,10 @@
 import styled from '@emotion/styled'
 import {ArrowDropDown as ArrowDropDownIcon} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {useFragment} from 'react-relay'
+import {EditableTemplateScaleValueColor_scale$key} from '~/__generated__/EditableTemplateScaleValueColor_scale.graphql'
 import PlainButton from '~/components/PlainButton/PlainButton'
 import {BezierCurve} from '~/types/constEnums'
-import {EditableTemplateScaleValueColor_scale$key} from '~/__generated__/EditableTemplateScaleValueColor_scale.graphql'
 import {MenuPosition} from '../../../hooks/useCoords'
 import useMenu from '../../../hooks/useMenu'
 import {PALETTE} from '../../../styles/paletteV3'
@@ -67,8 +66,7 @@ const EditableTemplateScaleValueColor = (props: Props) => {
     scaleRef
   )
   const {menuProps, menuPortal, originRef, togglePortal} = useMenu<HTMLButtonElement>(
-    MenuPosition.UPPER_LEFT,
-    {parentId: 'templateModal'}
+    MenuPosition.UPPER_LEFT
   )
   return (
     <ScaleValueColor ref={originRef} onClick={togglePortal}>

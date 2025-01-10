@@ -28,39 +28,44 @@ type Organization {
   creditCard: CreditCard
 
   """
-  The assumed company this organizaiton belongs to
-  """
-  company: Company
-
-  """
   true if the viewer is the billing leader for the org
   """
   isBillingLeader: Boolean!
 
   """
-  Basic meeting metadata for aggregated stats across the entire organization.
-  Includes metadata on teams the viewer is not apart of
+  true if the viewer holds the the org admin role on the org
   """
-  meetingStats: [MeetingStat!]!
+  isOrgAdmin: Boolean!
+
   """
   The name of the organization
   """
   name: String!
 
   """
-  The org avatar
+  Number of teams with 3+ meetings (>1 attendee) that met within last 30 days
   """
-  picture: URL
+  activeTeamCount: Int!
+
+  """
+  All the teams in the organization. If the viewer is not a billing lead, org admin, super user, or they do not have the publicTeams flag, return the teams they are a member of.
+  """
+  allTeams: [Team!]!
+
+  """
+  The count of all teams in the organization
+  """
+  allTeamsCount: Int!
 
   """
   all the teams the viewer is on in the organization
   """
-  teams: [Team!]!
+  viewerTeams: [Team!]!
 
   """
-  The level of access to features on the parabol site
+  all the teams that the viewer does not belong to that are in the organization. Only visible if the org has the publicTeams flag set to true.
   """
-  tier: TierEnum!
+  publicTeams: [Team!]!
 
   """
   THe datetime the current billing cycle ends
@@ -140,7 +145,36 @@ type Organization {
   """
   The leaders of the org
   """
-  billingLeaders: [User!]!
+  billingLeaders: [OrganizationUser!]!
+
+  """
+  The assumed company this organizaiton belongs to
+  """
+  company: Company
+
+  """
+  Basic meeting metadata for aggregated stats across the entire organization.
+  Includes metadata on teams the viewer is not apart of
+  """
+  meetingStats: [MeetingStat!]!
+
+  """
+  The org avatar
+  """
+  picture: URL
+  tier: TierEnum!
+
+  """
+  Whether the org has access to AI features
+  """
+  useAI: Boolean!
+
+  billingTier: TierEnum!
+
+  """
+  When the trial started, iff there is a trial active
+  """
+  trialStartDate: DateTime
 
   """
   Minimal details about all teams in the organization
@@ -148,26 +182,28 @@ type Organization {
   teamStats: [TeamStat!]!
 
   """
-  Any super power given to the organization via a super user
+  Whether the org has a feature flag enabled or not
   """
-  featureFlags: OrganizationFeatureFlags!
-}
+  featureFlag(featureName: String!): Boolean!
 
-type MeetingStat {
-  id: ID!
-  meetingType: MeetingTypeEnum!
-  createdAt: DateTime!
-}
+  """
+  The SAML record attached to the Organization, if any
+  """
+  saml: SAML
 
-type TeamStat {
-  id: ID!
-  createdAt: DateTime!
-}
+  """
+  A list of domains approved by the organization to join.
+  Empty if all domains are allowed
+  """
+  approvedDomains: [String!]!
 
-"""
-The types of flags that give an individual organization super powers
-"""
-type OrganizationFeatureFlags {
-  teamsLimit: Boolean!
-  SAMLUI: Boolean!
+  """
+  Custom integration providers with organization scope
+  """
+  integrationProviders: OrgIntegrationProviders!
+
+  """
+  The feature flags the org has enabled
+  """
+  orgFeatureFlags: [OwnedFeatureFlag!]!
 }

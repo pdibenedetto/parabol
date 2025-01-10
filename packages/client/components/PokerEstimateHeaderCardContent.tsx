@@ -1,6 +1,6 @@
 import styled from '@emotion/styled'
 import {Launch} from '@mui/icons-material'
-import React, {useState} from 'react'
+import {useState} from 'react'
 import useBreakpoint from '~/hooks/useBreakpoint'
 import {Elevation} from '~/styles/elevation'
 import {PALETTE} from '~/styles/paletteV3'
@@ -41,7 +41,7 @@ const CardTitleWrapper = styled('div')({
   width: '100%'
 })
 
-const CardDescription = styled('div')<{isExpanded: boolean}>(({isExpanded}) => ({
+const CardDescriptionWrapper = styled('div')<{isExpanded: boolean}>(({isExpanded}) => ({
   color: PALETTE.SLATE_700,
   fontWeight: 'normal',
   lineHeight: '20px',
@@ -51,6 +51,16 @@ const CardDescription = styled('div')<{isExpanded: boolean}>(({isExpanded}) => (
   overflowY: isExpanded ? 'auto' : 'hidden',
   transition: 'all 300ms'
 }))
+
+const CardDescriptionContent = styled('div')`
+  a {
+    text-decoration: underline;
+    :hover,
+    :focus {
+      color: ${PALETTE.SLATE_700};
+    }
+  }
+`
 
 const StyledIcon = styled(Launch)({
   height: 18,
@@ -97,10 +107,9 @@ const PokerEstimateHeaderCardContent = (props: PokerEstimateHeaderCardContentPro
             </CardButton>
           </CardIcons>
         </CardTitleWrapper>
-        <CardDescription
-          isExpanded={isExpanded}
-          dangerouslySetInnerHTML={{__html: descriptionHTML}}
-        />
+        <CardDescriptionWrapper isExpanded={isExpanded}>
+          <CardDescriptionContent dangerouslySetInnerHTML={{__html: descriptionHTML}} />
+        </CardDescriptionWrapper>
         <StyledLink href={url} rel='noopener noreferrer' target='_blank' title={linkTitle}>
           <StyledLabel>{linkText}</StyledLabel>
           <StyledIcon />

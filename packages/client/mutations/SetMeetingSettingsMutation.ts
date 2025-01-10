@@ -1,10 +1,7 @@
 import graphql from 'babel-plugin-relay/macro'
 import {commitMutation} from 'react-relay'
+import {SetMeetingSettingsMutation as TSetMeetingSettingsMutation} from '../__generated__/SetMeetingSettingsMutation.graphql'
 import {StandardMutation} from '../types/relayMutations'
-import {
-  SetMeetingSettingsMutation as TSetMeetingSettingsMutation,
-  SetMeetingSettingsMutationResponse
-} from '../__generated__/SetMeetingSettingsMutation.graphql'
 
 graphql`
   fragment SetMeetingSettingsMutation_team on SetMeetingSettingsPayload {
@@ -12,6 +9,7 @@ graphql`
       phaseTypes
       ... on RetrospectiveMeetingSettings {
         disableAnonymity
+        videoMeetingURL
       }
     }
   }
@@ -21,19 +19,25 @@ const mutation = graphql`
   mutation SetMeetingSettingsMutation(
     $settingsId: ID!
     $checkinEnabled: Boolean
+    $teamHealthEnabled: Boolean
     $disableAnonymity: Boolean
+    $videoMeetingURL: String
   ) {
     setMeetingSettings(
       settingsId: $settingsId
       checkinEnabled: $checkinEnabled
+      teamHealthEnabled: $teamHealthEnabled
       disableAnonymity: $disableAnonymity
+      videoMeetingURL: $videoMeetingURL
     ) {
       ...SetMeetingSettingsMutation_team @relay(mask: false)
     }
   }
 `
 
-type Settings = NonNullable<SetMeetingSettingsMutationResponse['setMeetingSettings']['settings']>
+type Settings = NonNullable<
+  TSetMeetingSettingsMutation['response']['setMeetingSettings']['settings']
+>
 
 const SetMeetingSettingsMutation: StandardMutation<TSetMeetingSettingsMutation> = (
   atmosphere,

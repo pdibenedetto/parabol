@@ -1,8 +1,10 @@
 import graphql from 'babel-plugin-relay/macro'
+import {mapDiscussionMentionedToToast_notification$data} from '../../__generated__/mapDiscussionMentionedToToast_notification.graphql'
 import {Snack} from '../../components/Snackbar'
 import {OnNextHistoryContext} from '../../types/relayMutations'
+import findStageById from '../../utils/meetings/findStageById'
 import fromStageIdToUrl from '../../utils/meetings/fromStageIdToUrl'
-import {mapDiscussionMentionedToToast_notification} from '../../__generated__/mapDiscussionMentionedToToast_notification.graphql'
+import getMeetingPathParams from '../../utils/meetings/getMeetingPathParams'
 import makeNotificationToastKey from './makeNotificationToastKey'
 
 graphql`
@@ -15,6 +17,12 @@ graphql`
     meeting {
       id
       name
+      phases {
+        phaseType
+        stages {
+          id
+        }
+      }
       ...fromStageIdToUrl_meeting
     }
     discussion {
@@ -33,20 +41,29 @@ graphql`
 `
 
 const mapDiscussionMentionedToToast = (
-  notification: mapDiscussionMentionedToToast_notification,
+  notification: mapDiscussionMentionedToToast_notification$data,
   {history}: OnNextHistoryContext
 ): Snack | null => {
   if (!notification) return null
   const {id: notificationId, meeting, author, discussion} = notification
-  const {preferredName: authorName} = author
+  const authorName = author ? author.preferredName : 'Anonymous'
   const {id: meetingId, name: meetingName} = meeting
   const {stage} = discussion
   const {id: stageId, response} = stage ?? {}
 
-  const directUrl = stageId ? fromStageIdToUrl(stageId, meeting) : `/meet/${meetingId}`
+  const meetingPath = getMeetingPathParams()
+  const notifStageRes = findStageById(meeting.phases, stageId)
+  if (
+    meetingPath.meetingId === meetingId &&
+    (!stageId ||
+      (notifStageRes?.stageIdx === meetingPath.stageIdx &&
+        notifStageRes?.phase.phaseType === meetingPath.phaseType))
+  ) {
+    // We're already in the relevant stage of the meeting, so don't pop toast.
+    return null
+  }
 
-  // :TODO: (jmtaber129): Check if we're already open to the relevant standup response discussion
-  // thread, and do nothing if we are.
+  const directUrl = stageId ? fromStageIdToUrl(stageId, meeting) : `/meet/${meetingId}`
 
   return {
     key: makeNotificationToastKey(notificationId),

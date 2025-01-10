@@ -1,5 +1,5 @@
 import graphql from 'babel-plugin-relay/macro'
-import React, {ReactElement, Suspense} from 'react'
+import {ReactElement, Suspense} from 'react'
 import {useFragment} from 'react-relay'
 import {
   NewMeetingPhaseTypeEnum,
@@ -25,6 +25,7 @@ const phaseLookup = {
   checkin: lazyPreload(
     () => import(/* webpackChunkName: 'NewMeetingCheckIn' */ './NewMeetingCheckIn')
   ),
+  TEAM_HEALTH: lazyPreload(() => import(/* webpackChunkName: 'TeamHealth' */ './TeamHealth')),
   reflect: lazyPreload(
     () =>
       import(/* webpackChunkName: 'RetroReflectPhase' */ './RetroReflectPhase/RetroReflectPhase')
@@ -51,6 +52,7 @@ const RetroMeeting = (props: Props) => {
         ...useMeeting_meeting
         ...RetroMeetingSidebar_meeting
         ...NewMeetingCheckIn_meeting
+        ...TeamHealth_meeting
         ...RetroReflectPhase_meeting
         ...RetroGroupPhase_meeting
         ...RetroVotePhase_meeting

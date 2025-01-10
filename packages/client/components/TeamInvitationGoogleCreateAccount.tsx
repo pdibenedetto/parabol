@@ -1,12 +1,13 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useState} from 'react'
-import {createFragmentContainer} from 'react-relay'
+import {useState} from 'react'
+import {useFragment} from 'react-relay'
+import {TeamInvitationGoogleCreateAccount_verifiedInvitation$key} from '../__generated__/TeamInvitationGoogleCreateAccount_verifiedInvitation.graphql'
 import useDocumentTitle from '../hooks/useDocumentTitle'
 import useRouter from '../hooks/useRouter'
 import {PALETTE} from '../styles/paletteV3'
-import {TeamInvitationGoogleCreateAccount_verifiedInvitation} from '../__generated__/TeamInvitationGoogleCreateAccount_verifiedInvitation.graphql'
 import AuthPrivacyFooter from './AuthPrivacyFooter'
+import {AUTH_DIALOG_WIDTH} from './AuthenticationDialog'
 import DialogContent from './DialogContent'
 import DialogTitle from './DialogTitle'
 import EmailPasswordAuthForm from './EmailPasswordAuthForm'
@@ -19,11 +20,11 @@ import PlainButton from './PlainButton/PlainButton'
 
 interface Props {
   invitationToken: string
-  verifiedInvitation: TeamInvitationGoogleCreateAccount_verifiedInvitation
+  verifiedInvitation: TeamInvitationGoogleCreateAccount_verifiedInvitation$key
 }
 
 const StyledDialog = styled(InviteDialog)({
-  maxWidth: 356
+  maxWidth: AUTH_DIALOG_WIDTH
 })
 
 const StyledContent = styled(DialogContent)({
@@ -50,7 +51,19 @@ const TeamInvitationGoogleCreateAccount = (props: Props) => {
   const {match} = useRouter<{token: string}>()
   const {params} = match
   const {token: invitationToken} = params
-  const {verifiedInvitation} = props
+  const {verifiedInvitation: verifiedInvitationRef} = props
+  const verifiedInvitation = useFragment(
+    graphql`
+      fragment TeamInvitationGoogleCreateAccount_verifiedInvitation on VerifiedInvitationPayload {
+        meetingName
+        teamInvitation {
+          email
+        }
+        teamName
+      }
+    `,
+    verifiedInvitationRef
+  )
   const {meetingName, teamInvitation, teamName} = verifiedInvitation
 
   const useEmail = () => {
@@ -89,14 +102,4 @@ const TeamInvitationGoogleCreateAccount = (props: Props) => {
   )
 }
 
-export default createFragmentContainer(TeamInvitationGoogleCreateAccount, {
-  verifiedInvitation: graphql`
-    fragment TeamInvitationGoogleCreateAccount_verifiedInvitation on VerifiedInvitationPayload {
-      meetingName
-      teamInvitation {
-        email
-      }
-      teamName
-    }
-  `
-})
+export default TeamInvitationGoogleCreateAccount

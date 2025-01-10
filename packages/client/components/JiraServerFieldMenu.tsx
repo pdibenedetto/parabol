@@ -1,13 +1,13 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useMemo} from 'react'
+import {useMemo} from 'react'
 import {useFragment} from 'react-relay'
 import {PALETTE} from '~/styles/paletteV3'
+import {JiraServerFieldMenu_stage$key} from '../__generated__/JiraServerFieldMenu_stage.graphql'
 import useAtmosphere from '../hooks/useAtmosphere'
 import {MenuProps} from '../hooks/useMenu'
 import UpdateJiraServerDimensionFieldMutation from '../mutations/UpdateJiraServerDimensionFieldMutation'
 import {SprintPokerDefaults} from '../types/constEnums'
-import {JiraServerFieldMenu_stage$key} from '../__generated__/JiraServerFieldMenu_stage.graphql'
 import Menu from './Menu'
 import MenuItem from './MenuItem'
 import MenuItemHR from './MenuItemHR'
@@ -44,7 +44,7 @@ const JiraServerFieldMenu = (props: Props) => {
             ... on JiraServerIssue {
               __typename
               id
-              projectId
+              jiraProjectId: projectId
               issueType
               possibleEstimationFieldNames
             }
@@ -59,7 +59,7 @@ const JiraServerFieldMenu = (props: Props) => {
   if (task?.integration?.__typename !== 'JiraServerIssue') return null
 
   const {integration} = task
-  const {projectId, issueType, possibleEstimationFieldNames} = integration
+  const {jiraProjectId, issueType, possibleEstimationFieldNames} = integration
 
   const {name: dimensionName} = dimensionRef
   const {name: serviceFieldName} = serviceField
@@ -81,7 +81,7 @@ const JiraServerFieldMenu = (props: Props) => {
         dimensionName,
         fieldName,
         issueType,
-        projectId,
+        projectId: jiraProjectId,
         meetingId
       },
       {

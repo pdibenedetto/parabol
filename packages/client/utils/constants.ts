@@ -5,12 +5,11 @@
  - Does the variable come from the GraphQL schema? If so, import it from a file in the __generated__ folder
  - Is the variable a string? Create a string union & pass in a plain string to get type safety
 */
-import {TaskStatusEnum} from '~/__generated__/UpdateTaskMutation.graphql'
-
-/**
- * Big stuff:
- */
-export const APP_CDN_USER_ASSET_SUBDIR = '/store'
+import {ReadableReasonToDowngradeEnum} from '../../server/graphql/types/ReasonToDowngrade'
+import {ReasonToDowngradeEnum} from '../__generated__/DowngradeToStarterMutation.graphql'
+import {TimelineEventEnum} from '../__generated__/MyDashboardTimelineQuery.graphql'
+import {TaskStatusEnum} from '../__generated__/UpdateTaskMutation.graphql'
+import {Threshold} from '../types/constEnums'
 
 /* Meeting Misc. */
 export const MEETING_NAME = 'Check-in Meeting'
@@ -23,6 +22,7 @@ export const LOBBY = 'lobby'
 
 // lowercase here to match url
 export const CHECKIN = 'checkin'
+export const TEAM_HEALTH = 'teamhealth'
 export const UPDATES = 'updates'
 export const FIRST_CALL = 'firstcall'
 export const AGENDA_ITEMS = 'agendaitems'
@@ -94,11 +94,14 @@ export const NOTIFICATIONS = 'notifications'
 /* Org Settings */
 export const BILLING_PAGE = 'billing'
 export const MEMBERS_PAGE = 'members'
+export const TEAMS_PAGE = 'teams'
+export const ORG_SETTINGS_PAGE = 'settings'
+export const ORG_INTEGRATIONS_PAGE = 'integrations'
 export const AUTHENTICATION_PAGE = 'authentication'
 
 /* Stripe */
 // changing this does NOT change it in stripe, it just changes the UI
-export const MONTHLY_PRICE = 6
+export const MONTHLY_PRICE = 8
 
 export const FAILED = 'FAILED'
 
@@ -158,3 +161,72 @@ export const MAX_SPOTLIGHT_COLUMNS = 3
 export const SPOTLIGHT_TOP_SECTION_HEIGHT = 236
 
 export const PARABOL_AI_USER_ID = 'parabolAIUser'
+
+export const StarterBenefits = [
+  `${Threshold.MAX_STARTER_TIER_TEAMS} teams`,
+  'Retrospectives, Sprint Poker, Standups, Check-Ins',
+  'Unlimited meeting templates',
+  'Unlimited team members'
+]
+
+export const TeamBenefits = [
+  'Unlimited teams',
+  'Unlimited custom templates',
+  'Unlimited meeting history',
+  'Priority customer support',
+  'AI Summaries',
+  'Team Health'
+]
+
+export const EnterpriseBenefits = [
+  'Single Sign-On (SSO)',
+  'Org Admin Role',
+  'Annual Billing',
+  'Domain Whitelisting',
+  'Uptime Service Level Agreement (SLA)',
+  'On-Premises Hosting Option',
+  'Jira Data Center Integration'
+]
+
+export const readableReasonsToDowngrade: ReadableReasonToDowngradeEnum[] = [
+  'Parabol is too expensive',
+  'Budget changes',
+  'Missing key features',
+  `Not using Parabol's paid features`,
+  'Moving to another tool (please specify)'
+]
+
+export const reasonsToDowngradeLookup: Record<
+  ReadableReasonToDowngradeEnum,
+  ReasonToDowngradeEnum
+> = {
+  'Parabol is too expensive': 'tooExpensive',
+  'Budget changes': 'budgetChanges',
+  'Missing key features': 'missingKeyFeatures',
+  "Not using Parabol's paid features": 'notUsingPaidFeatures',
+  'Moving to another tool (please specify)': 'anotherTool'
+}
+
+export const timelineEventTypeMenuLabels: Record<TimelineEventEnum, string> = {
+  retroComplete: 'Retrospective',
+  actionComplete: 'Team Check-in',
+  joinedParabol: 'Joined Parabol',
+  createdTeam: 'New Team Created',
+  POKER_COMPLETE: 'Sprint Poker',
+  TEAM_PROMPT_COMPLETE: 'Standup'
+}
+
+export const CUSTOMIZED_SVG = 'Customized SVG'
+
+export const timelineEventTypeMenuIcons: Record<TimelineEventEnum, string | undefined> = {
+  retroComplete: 'history',
+  actionComplete: 'change_history',
+  joinedParabol: 'account_circle',
+  createdTeam: 'group_add',
+  POKER_COMPLETE: CUSTOMIZED_SVG,
+  TEAM_PROMPT_COMPLETE: 'group_work'
+}
+
+/* OpenAI */
+export const MAX_GPT_3_5_TOKENS = 4096 // https://platform.openai.com/docs/models/gpt-3-5
+export const AVG_CHARS_PER_TOKEN = 4 // 1 token ~= 4 chars https://help.openai.com/en/articles/4936856-what-are-tokens-and-how-to-count-them

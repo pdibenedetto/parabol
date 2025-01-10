@@ -1,5 +1,7 @@
 import styled from '@emotion/styled'
-import React, {lazy} from 'react'
+import * as React from 'react'
+import {lazy} from 'react'
+import {UserProfileQuery} from '../../../../__generated__/UserProfileQuery.graphql'
 import EditableAvatar from '../../../../components/EditableAvatar/EditableAvatar'
 import FieldLabel from '../../../../components/FieldLabel/FieldLabel'
 import BasicInput from '../../../../components/InputField/BasicInput'
@@ -13,7 +15,6 @@ import defaultUserAvatar from '../../../../styles/theme/images/avatar-user.svg'
 import {Breakpoint, Layout} from '../../../../types/constEnums'
 import withForm, {WithFormProps} from '../../../../utils/relay/withForm'
 import Legitity from '../../../../validation/Legitity'
-import {UserProfileQueryResponse} from '../../../../__generated__/UserProfileQuery.graphql'
 import NotificationErrorMessage from '../../../notifications/components/NotificationErrorMessage'
 
 const SettingsForm = styled('form')({
@@ -62,7 +63,7 @@ const UserAvatarInput = lazy(
 )
 
 interface UserSettingsProps extends WithFormProps<'preferredName'> {
-  viewer: UserProfileQueryResponse['viewer']
+  viewer: UserProfileQuery['response']['viewer']
 }
 
 function UserSettings(props: UserSettingsProps) {
@@ -84,9 +85,9 @@ function UserSettings(props: UserSettingsProps) {
   return (
     <SettingsForm onSubmit={onSubmit}>
       <div onClick={togglePortal}>
-        <EditableAvatar picture={pictureOrDefault} size={96} />
+        <EditableAvatar picture={pictureOrDefault} className='h-24 w-24' />
       </div>
-      {modalPortal(<UserAvatarInput picture={pictureOrDefault} />)}
+      {modalPortal(<UserAvatarInput closeModal={togglePortal} picture={pictureOrDefault} />)}
       <InfoBlock>
         <FieldLabel
           customStyles={{paddingBottom: 8}}

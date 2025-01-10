@@ -1,21 +1,18 @@
 import graphql from 'babel-plugin-relay/macro'
-import React, {lazy, Suspense, useEffect} from 'react'
+import {lazy, Suspense, useEffect} from 'react'
 import {PreloadedQuery, usePreloadedQuery} from 'react-relay'
 import {Route} from 'react-router'
 import {matchPath, Switch} from 'react-router-dom'
 import ErrorBoundary from '~/components/ErrorBoundary'
-import useRouter from '../../../../hooks/useRouter'
 import {TeamContainerQuery} from '../../../../__generated__/TeamContainerQuery.graphql'
+import useRouter from '../../../../hooks/useRouter'
 import Team from '../../components/Team/Team'
 
 const TeamDashMain = lazy(
   () => import(/* webpackChunkName: 'TeamDashMainRoot' */ '../../components/TeamDashMainRoot')
 )
 const TeamSettings = lazy(
-  () =>
-    import(
-      /* webpackChunkName: 'TeamSettingsWrapper' */ '../../components/TeamSettingsWrapper/TeamSettingsWrapper'
-    )
+  () => import(/* webpackChunkName: 'TeamIntegrationsRoot' */ '../../components/TeamSettingsRoot')
 )
 const ArchivedTasks = lazy(
   () => import(/* webpackChunkName: 'ArchiveTaskRoot' */ '../../../../components/ArchiveTaskRoot')
@@ -35,6 +32,7 @@ const TeamContainer = (props: Props) => {
     graphql`
       query TeamContainerQuery($teamId: ID!) {
         viewer {
+          canAccessTeam: canAccess(entity: Team, id: $teamId)
           team(teamId: $teamId) {
             ...Team_team
             ...TeamArchive_team
@@ -43,16 +41,15 @@ const TeamContainer = (props: Props) => {
         }
       }
     `,
-    queryRef,
-    {UNSTABLE_renderPolicy: 'full'}
+    queryRef
   )
   const {viewer} = data
-  const {team} = viewer
+  const {team, canAccessTeam} = viewer
   const {history, match} = useRouter()
   const {location} = window
   const {pathname} = location
   useEffect(() => {
-    if (!team) {
+    if (!canAccessTeam && !team) {
       history.replace({
         pathname: `/invitation-required`,
         search: `?redirectTo=${encodeURIComponent(pathname)}&teamId=${teamId}`
@@ -72,14 +69,17 @@ const TeamContainer = (props: Props) => {
         <Suspense fallback={''}>
           <Switch>
             {/* TODO: replace match.path with a relative when the time comes: https://github.com/ReactTraining/react-router/pull/4539 */}
-            <Route exact path={match.path} component={TeamDashMain} />
-            <Route path={`${match.path}/settings`} component={TeamSettings} />
+            <Route
+              path={`${match.path}/settings`}
+              render={(p) => <TeamSettings {...p} teamId={teamId} />}
+            />
             <Route
               path={`${match.path}/archive`}
               render={(p) => (
                 <ArchivedTasks {...p} team={team} returnToTeamId={teamId} teamIds={[teamId]} />
               )}
             />
+            <Route path={match.path} component={TeamDashMain} />
           </Switch>
         </Suspense>
       </Team>

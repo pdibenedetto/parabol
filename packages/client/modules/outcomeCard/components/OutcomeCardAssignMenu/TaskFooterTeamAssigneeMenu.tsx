@@ -1,13 +1,15 @@
 import graphql from 'babel-plugin-relay/macro'
-import React, {useMemo, useState} from 'react'
+import {useMemo, useState} from 'react'
 import {PreloadedQuery, useFragment, usePreloadedQuery} from 'react-relay'
+import {TaskFooterTeamAssigneeMenu_viewerIntegrationsQuery} from '~/__generated__/TaskFooterTeamAssigneeMenu_viewerIntegrationsQuery.graphql'
 import {EmptyDropdownMenuItemLabel} from '~/components/EmptyDropdownMenuItemLabel'
 import {SearchMenuItem} from '~/components/SearchMenuItem'
 import useEventCallback from '~/hooks/useEventCallback'
 import useModal from '~/hooks/useModal'
 import useSearchFilter from '~/hooks/useSearchFilter'
-import {useUserTaskFilters} from '~/utils/useUserTaskFilters'
-import {TaskFooterTeamAssigneeMenu_viewerIntegrationsQuery} from '~/__generated__/TaskFooterTeamAssigneeMenu_viewerIntegrationsQuery.graphql'
+import {useQueryParameterParser} from '~/utils/useQueryParameterParser'
+import {TaskFooterTeamAssigneeMenuQuery} from '../../../../__generated__/TaskFooterTeamAssigneeMenuQuery.graphql'
+import {TaskFooterTeamAssigneeMenu_task$key} from '../../../../__generated__/TaskFooterTeamAssigneeMenu_task.graphql'
 import DropdownMenuLabel from '../../../../components/DropdownMenuLabel'
 import Menu from '../../../../components/Menu'
 import MenuItem from '../../../../components/MenuItem'
@@ -15,8 +17,6 @@ import useAtmosphere from '../../../../hooks/useAtmosphere'
 import {MenuProps} from '../../../../hooks/useMenu'
 import useMutationProps from '../../../../hooks/useMutationProps'
 import ChangeTaskTeamMutation from '../../../../mutations/ChangeTaskTeamMutation'
-import {TaskFooterTeamAssigneeMenuQuery} from '../../../../__generated__/TaskFooterTeamAssigneeMenuQuery.graphql'
-import {TaskFooterTeamAssigneeMenu_task$key} from '../../../../__generated__/TaskFooterTeamAssigneeMenu_task.graphql'
 import TaskFooterTeamAssigneeAddIntegrationDialog from './TaskFooterTeamAssigneeAddIntegrationDialog'
 
 const query = graphql`
@@ -63,13 +63,11 @@ const gqlQuery = graphql`
 
 const TaskFooterTeamAssigneeMenu = (props: Props) => {
   const {menuProps, task: taskRef, queryRef} = props
-  const data = usePreloadedQuery<TaskFooterTeamAssigneeMenuQuery>(gqlQuery, queryRef, {
-    UNSTABLE_renderPolicy: 'full'
-  })
+  const data = usePreloadedQuery<TaskFooterTeamAssigneeMenuQuery>(gqlQuery, queryRef)
   const {viewer} = data
 
   const {closePortal: closeTeamAssigneeMenu} = menuProps
-  const {userIds, teamIds} = useUserTaskFilters(viewer.id)
+  const {userIds, teamIds} = useQueryParameterParser(viewer.id)
 
   const task = useFragment(
     graphql`
@@ -119,8 +117,7 @@ const TaskFooterTeamAssigneeMenu = (props: Props) => {
     closePortal: closeAddIntegrationPortal
   } = useModal({
     onClose: onDialogClose,
-    id: 'taskFooterTeamAssigneeAddIntegration',
-    parentId: 'taskFooterTeamAssigneeMenu'
+    id: 'taskFooterTeamAssigneeAddIntegration'
   })
   const [newTeam, setNewTeam] = useState({id: '', name: ''})
 

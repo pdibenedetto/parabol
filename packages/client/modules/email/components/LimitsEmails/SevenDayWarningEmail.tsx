@@ -1,5 +1,4 @@
 import {ContactInfo, ExternalLinks, Threshold} from 'parabol-client/types/constEnums'
-import React from 'react'
 import {EMAIL_CORS_OPTIONS} from '../../../../types/cors'
 import makeAppURL from '../../../../utils/makeAppURL'
 import {emailCopyStyle, emailLinkStyle} from '../../styles'
@@ -53,9 +52,12 @@ export default function SevenDayWarningEmail(props: LimitsEmailProps) {
         <EmptySpace height={16} />
         <p style={{...copyStyle}}>
           {`You'll need to `}
-          <span style={{fontWeight: 600, textDecoration: 'underline'}}>
+          <a
+            style={{fontWeight: 600, textDecoration: 'underline', color: 'inherit'}}
+            href={billingURL}
+          >
             {`upgrade your account within the next ${Threshold.FINAL_WARNING_DAYS_BEFORE_LOCK} days`}
-          </span>
+          </a>
           {` to avoid losing access to your agile meetings.`}
         </p>
         <Button url={billingURL}>{'Keep Access'}</Button>

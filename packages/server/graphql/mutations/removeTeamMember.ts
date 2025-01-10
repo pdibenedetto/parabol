@@ -1,15 +1,18 @@
-import {GraphQLID, GraphQLNonNull} from 'graphql'
+import {GraphQLID, GraphQLNonNull, GraphQLObjectType} from 'graphql'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
 import fromTeamMemberId from 'parabol-client/utils/relay/fromTeamMemberId'
-import {getUserId, isTeamLead} from '../../utils/authorization'
+import TeamMemberId from '../../../client/shared/gqlIds/TeamMemberId'
+import {getUserId, isUserOrgAdmin} from '../../utils/authorization'
 import publish from '../../utils/publish'
 import standardError from '../../utils/standardError'
 import {GQLContext} from '../graphql'
-import RemoveTeamMemberPayload from '../types/RemoveTeamMemberPayload'
 import removeTeamMember from './helpers/removeTeamMember'
 
 export default {
-  type: RemoveTeamMemberPayload,
+  type: new GraphQLObjectType({
+    name: 'RemoveTeamMemberPayload',
+    fields: {}
+  }),
   description: 'Remove a team member from the team',
   args: {
     teamMemberId: {
@@ -28,10 +31,16 @@ export default {
     // AUTH
     const viewerId = getUserId(authToken)
     const {userId, teamId} = fromTeamMemberId(teamMemberId)
+    const team = await dataLoader.get('teams').loadNonNull(teamId)
+    const [isOrgAdmin, teamMember] = await Promise.all([
+      isUserOrgAdmin(viewerId, team.orgId, dataLoader),
+      dataLoader.get('teamMembers').loadNonNull(TeamMemberId.join(teamId, viewerId))
+    ])
+    const isViewerTeamLead = teamMember?.isLead
     const isSelf = viewerId === userId
     if (!isSelf) {
-      if (!(await isTeamLead(viewerId, teamId))) {
-        return standardError(new Error('Not team lead'), {userId: viewerId})
+      if (!isOrgAdmin && !isViewerTeamLead) {
+        return standardError(new Error('Not team lead or org admin'), {userId: viewerId})
       }
     }
 

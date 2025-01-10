@@ -1,7 +1,6 @@
-import {r} from 'rethinkdb-ts'
+import {sql} from 'kysely'
+import getKysely from '../../../postgres/getKysely'
 import getUsersbyDomain from '../../../postgres/queries/getUsersByDomain'
-import updateDomainsInOrganizationApprovedDomainToPG from '../../../postgres/queries/updateDomainsInOrganizationApprovedDomainToPG'
-import updateUserEmailDomainsToPG from '../../../postgres/queries/updateUserEmailDomainsToPG'
 import {MutationResolvers} from '../../private/resolverTypes'
 
 const changeEmailDomain: MutationResolvers['changeEmailDomain'] = async (
@@ -42,45 +41,45 @@ const changeEmailDomain: MutationResolvers['changeEmailDomain'] = async (
     .map(({id}) => id)
 
   // RESOLUTION
+  const pg = getKysely()
+
   const [updatedUserRes] = await Promise.all([
-    updateUserEmailDomainsToPG(normalizedNewDomain, userIdsToUpdate),
-    updateDomainsInOrganizationApprovedDomainToPG(normalizedOldDomain, normalizedNewDomain),
-    r
-      .table('Organization')
-      .filter((row) => row('activeDomain').eq(normalizedOldDomain))
-      .update({activeDomain: normalizedNewDomain})
-      .run(),
-    r
-      .table('TeamMember')
-      .filter((row) => row('email').match(`@${normalizedOldDomain}$`))
-      .update((row) => ({email: row('email').split('@').nth(0).add(`@${normalizedNewDomain}`)}))
-      .run(),
-    r
-      .table('SAML')
-      .filter((row) => row('domains').contains(normalizedOldDomain))
-      .update((row) => ({
-        domains: row('domains').map((domain) =>
-          r.branch(domain.eq(normalizedOldDomain), normalizedNewDomain, domain)
-        )
-      }))
-      .run(),
-    r
-      .table('Invoice')
-      .filter((row) =>
-        row('billingLeaderEmails').contains((email) =>
-          email.split('@').nth(1).eq(normalizedOldDomain)
-        )
+    pg
+      .with('TeamMembersUpdate', (qc) =>
+        qc
+          .updateTable('TeamMember')
+          .set({
+            email: sql`CONCAT(LEFT(email, POSITION('@' in email)), ${normalizedNewDomain}::VARCHAR)`
+          })
+          .where('userId', 'in', userIdsToUpdate)
       )
-      .update((row) => ({
-        billingLeaderEmails: row('billingLeaderEmails').map((email) =>
-          r.branch(
-            email.split('@').nth(1).eq(normalizedOldDomain),
-            email.split('@').nth(0).add(`@${normalizedNewDomain}`),
-            email
-          )
-        )
-      }))
-      .run()
+      .with('OrganizationApprovedDomainUpdate', (qc) =>
+        qc
+          .updateTable('OrganizationApprovedDomain')
+          .set({
+            domain: sql`REPLACE("domain", ${normalizedOldDomain}, ${normalizedNewDomain})`
+          })
+          .where('domain', 'like', normalizedOldDomain)
+      )
+      .with('OrganizationUpdate', (qc) =>
+        qc
+          .updateTable('Organization')
+          .set({activeDomain: normalizedNewDomain})
+          .where('activeDomain', '=', normalizedOldDomain)
+      )
+      .with('SAMLUpdate', (qc) =>
+        qc
+          .updateTable('SAMLDomain')
+          .set({domain: normalizedNewDomain})
+          .where('domain', '=', normalizedOldDomain)
+      )
+      .updateTable('User')
+      .set({
+        email: sql`CONCAT(LEFT(email, POSITION('@' in email)), ${normalizedNewDomain}::VARCHAR)`
+      })
+      .where('id', 'in', userIdsToUpdate)
+      .returning('id')
+      .execute()
   ])
 
   const usersUpdatedIds = updatedUserRes.map(({id}) => id)

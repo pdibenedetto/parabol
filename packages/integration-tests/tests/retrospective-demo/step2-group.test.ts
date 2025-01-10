@@ -1,10 +1,10 @@
+import {expect, test} from '@playwright/test'
 import config from '../config'
-import {test, expect} from '@playwright/test'
 import {
-  startDemo,
   dragReflectionCard,
   goToNextPhase,
-  skipToGroupPhase
+  skipToGroupPhase,
+  startDemo
 } from './retrospective-demo-helpers'
 
 test.describe('retrospective-demo / group page', () => {
@@ -26,10 +26,7 @@ test.describe('retrospective-demo / group page', () => {
     await page.type(continueTextbox, 'Continue doing this')
     await page.press(continueTextbox, 'Enter')
 
-    const nextButton = page.locator('button :text("Next")')
-    await expect(nextButton).toBeVisible()
-    await nextButton.click()
-    await nextButton.click()
+    await goToNextPhase(page)
     expect(page.url()).toEqual(`${config.rootUrlPath}/retrospective-demo/group`)
 
     await expect(
@@ -50,10 +47,16 @@ test.describe('retrospective-demo / group page', () => {
     await page.click(startTextbox)
     await page.type(startTextbox, 'Documenting things in Notion')
     await page.press(startTextbox, 'Enter')
+    await expect(
+      page.locator('[data-cy="reflection-column-Start"] :text("Documenting things in Notion")')
+    ).toBeVisible()
 
     await page.click(startTextbox)
     await page.type(startTextbox, 'Writing things down')
     await page.press(startTextbox, 'Enter')
+    await expect(
+      page.locator('[data-cy="reflection-column-Start"] :text("Writing things down")')
+    ).toBeVisible()
 
     await goToNextPhase(page)
     expect(page.url()).toEqual(`${config.rootUrlPath}/retrospective-demo/group`)
@@ -64,9 +67,7 @@ test.describe('retrospective-demo / group page', () => {
 
     // Then it auto-generates a header
     await expect(
-      page.locator(
-        `[data-cy=group-column-Start] [data-cy*="Start-group-"] input[value="Documenting things in"]`
-      )
+      page.locator(`[data-cy=group-column-Start] [data-cy*="Start-group-"] input[value="Things"]`)
     ).toBeVisible()
 
     // Then it shows all cards when clicking the group
@@ -92,13 +93,21 @@ test.describe('retrospective-demo / group page', () => {
 
     const startTextbox = '[data-cy=reflection-column-Start] [role=textbox]'
     await page.click(startTextbox)
-    await page.type(startTextbox, 'Documenting things in Notion')
+    await page.fill(startTextbox, 'Documenting things in Notion')
     await page.press(startTextbox, 'Enter')
+    await expect(
+      page.locator('[data-cy="reflection-column-Start"] :text("Documenting things in Notion")')
+    ).toBeVisible()
 
     const stopTextbox = '[data-cy=reflection-column-Stop] [role=textbox]'
     await page.click(stopTextbox)
-    await page.type(stopTextbox, 'Making decisions in one-on-one meetings')
+    await page.fill(stopTextbox, 'Making decisions in one-on-one meetings')
     await page.press(stopTextbox, 'Enter')
+    await expect(
+      page.locator(
+        '[data-cy="reflection-column-Stop"] :text("Making decisions in one-on-one meetings")'
+      )
+    ).toBeVisible()
 
     await goToNextPhase(page)
     expect(page.url()).toEqual(`${config.rootUrlPath}/retrospective-demo/group`)
@@ -110,7 +119,7 @@ test.describe('retrospective-demo / group page', () => {
     // Then it auto-generates a header
     await expect(
       page.locator(
-        `[data-cy=group-column-Start] [data-cy*="Start-group-"] input[value="Documenting things in"]`
+        `[data-cy=group-column-Start] [data-cy*="Start-group-"] input[value="Things Notion"]`
       )
     ).toBeVisible()
 

@@ -3,13 +3,14 @@ import useEmailItemGrid from 'parabol-client/hooks/useEmailItemGrid'
 import {PALETTE} from 'parabol-client/styles/paletteV3'
 import {FONT_FAMILY, ICON_SIZE} from 'parabol-client/styles/typographyV2'
 import plural from 'parabol-client/utils/plural'
-import React from 'react'
 import {useFragment} from 'react-relay'
+import {RetroTopic_meeting$key} from '../../../../../__generated__/RetroTopic_meeting.graphql'
+import {RetroTopic_stage$key} from '../../../../../__generated__/RetroTopic_stage.graphql'
 import {ExternalLinks} from '../../../../../types/constEnums'
 import {APP_CORS_OPTIONS, EMAIL_CORS_OPTIONS} from '../../../../../types/cors'
-import {RetroTopic_stage$key} from '../../../../../__generated__/RetroTopic_stage.graphql'
 import AnchorIfEmail from './AnchorIfEmail'
 import EmailReflectionCard from './EmailReflectionCard'
+import ShareTopic from './ShareTopic'
 
 const stageThemeHeading = {
   color: PALETTE.SLATE_700,
@@ -71,21 +72,23 @@ interface Props {
   isDemo: boolean
   isEmail: boolean
   stageRef: RetroTopic_stage$key
+  meetingRef: RetroTopic_meeting$key
   to: string
+  appOrigin: string
 }
 
 const RetroTopic = (props: Props) => {
-  const {isDemo, isEmail, to, stageRef} = props
+  const {isDemo, isEmail, to, stageRef, meetingRef, appOrigin} = props
   const stage = useFragment(
     graphql`
       fragment RetroTopic_stage on RetroDiscussStage {
+        id
         reflectionGroup {
           title
           voteCount
           reflections {
             ...EmailReflectionCard_reflection
           }
-          topicSummary: summary
         }
         discussion {
           commentCount
@@ -95,9 +98,20 @@ const RetroTopic = (props: Props) => {
     `,
     stageRef
   )
-  const {reflectionGroup, discussion} = stage
+
+  const meeting = useFragment(
+    graphql`
+      fragment RetroTopic_meeting on RetrospectiveMeeting {
+        id
+      }
+    `,
+    meetingRef
+  )
+
+  const {id: meetingId} = meeting
+  const {reflectionGroup, discussion, id: stageId} = stage
   const {commentCount, discussionSummary} = discussion
-  const {reflections, title, voteCount, topicSummary} = reflectionGroup!
+  const {reflections, title, voteCount} = reflectionGroup
   const imageSource = isEmail ? 'static' : 'local'
   const icon = imageSource === 'local' ? 'thumb_up_18.svg' : 'thumb_up_18@3x.png'
   const src = `${ExternalLinks.EMAIL_CDN}${icon}`
@@ -106,8 +120,8 @@ const RetroTopic = (props: Props) => {
     commentCount === 0
       ? 'No Comments'
       : commentCount >= 101
-      ? 'See 100+ Comments'
-      : `See ${commentCount} ${plural(commentCount, 'Comment')}`
+        ? 'See 100+ Comments'
+        : `See ${commentCount} ${plural(commentCount, 'Comment')}`
   const commentLinkStyle = commentCount === 0 ? noCommentLinkStyle : someCommentsLinkStyle
   const corsOptions = isEmail ? EMAIL_CORS_OPTIONS : APP_CORS_OPTIONS
   return (
@@ -119,29 +133,15 @@ const RetroTopic = (props: Props) => {
           </AnchorIfEmail>
         </td>
       </tr>
-      {(topicSummary || discussionSummary) && (
+      {discussionSummary && (
         <tr>
           <td align='left' style={{lineHeight: '22px', fontSize: 14}}>
-            {topicSummary && (
-              <>
-                <tr>
-                  <td style={topicTitleStyle}>{'🤖 Topic Summary'}</td>
-                </tr>
-                <tr>
-                  <td style={textStyle}>{topicSummary}</td>
-                </tr>
-              </>
-            )}
-            {discussionSummary && (
-              <>
-                <tr>
-                  <td style={topicTitleStyle}>{'🤖 Discussion Summary'}</td>
-                </tr>
-                <tr>
-                  <td style={textStyle}>{discussionSummary}</td>
-                </tr>
-              </>
-            )}
+            <tr>
+              <td style={topicTitleStyle}>{'🤖 Discussion Summary'}</td>
+            </tr>
+            <tr>
+              <td style={textStyle}>{discussionSummary}</td>
+            </tr>
           </td>
         </tr>
       )}
@@ -158,9 +158,24 @@ const RetroTopic = (props: Props) => {
       {!isDemo && (
         <tr>
           <td align='center'>
-            <AnchorIfEmail href={to} isEmail={isEmail} style={commentLinkStyle}>
-              {commentLinkLabel}
-            </AnchorIfEmail>
+            <table>
+              <tr>
+                <td className='text-center'>
+                  <AnchorIfEmail href={to} isEmail={isEmail} style={commentLinkStyle}>
+                    {commentLinkLabel}
+                  </AnchorIfEmail>
+                </td>
+                <td style={{padding: '10px'}}>
+                  <ShareTopic
+                    isEmail={isEmail}
+                    isDemo={isDemo}
+                    meetingId={meetingId}
+                    stageId={stageId}
+                    appOrigin={appOrigin}
+                  />
+                </td>
+              </tr>
+            </table>
           </td>
         </tr>
       )}

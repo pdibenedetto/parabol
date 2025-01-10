@@ -1,26 +1,21 @@
 import graphql from 'babel-plugin-relay/macro'
 import {commitMutation} from 'react-relay'
-import handleSuccessfulLogin from '~/utils/handleSuccessfulLogin'
-import {HistoryLocalHandler, StandardMutation} from '../types/relayMutations'
+import {handleSuccessfulLogin} from '~/utils/handleSuccessfulLogin'
 import {VerifyEmailMutation as TSignUpWithPasswordMutation} from '../__generated__/VerifyEmailMutation.graphql'
+import {HistoryLocalHandler, StandardMutation} from '../types/relayMutations'
 import handleAuthenticationRedirect from './handlers/handleAuthenticationRedirect'
 
 const mutation = graphql`
   mutation VerifyEmailMutation(
     $verificationToken: ID!
-    $invitationToken: ID! = ""
+    $invitationToken: ID!
     $isInvitation: Boolean!
   ) {
     verifyEmail(verificationToken: $verificationToken) {
       error {
         message
       }
-      authToken
-      user {
-        email
-        tms
-        ...UserAnalyticsFrag @relay(mask: false)
-      }
+      ...handleSuccessfulLogin_UserLogInPayload @relay(mask: false)
     }
     acceptTeamInvitation(invitationToken: $invitationToken) @include(if: $isInvitation) {
       ...AcceptTeamInvitationMutationReply @relay(mask: false)
@@ -43,7 +38,9 @@ const VerifyEmailMutation: StandardMutation<TSignUpWithPasswordMutation, History
       if (authToken) {
         handleSuccessfulLogin(verifyEmail)
         atmosphere.setAuthToken(authToken)
-        handleAuthenticationRedirect(acceptTeamInvitation, {atmosphere, history})
+        const redirectPath = '/meetings'
+
+        handleAuthenticationRedirect(acceptTeamInvitation, {atmosphere, history, redirectPath})
       }
     }
   })

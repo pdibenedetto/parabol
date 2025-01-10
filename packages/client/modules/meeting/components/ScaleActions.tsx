@@ -1,14 +1,14 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
+import * as React from 'react'
 import {commitLocalUpdate, useFragment} from 'react-relay'
+import {ScaleActions_scale$key} from '../../../__generated__/ScaleActions_scale.graphql'
 import DetailAction from '../../../components/DetailAction'
 import useAtmosphere from '../../../hooks/useAtmosphere'
 import useMutationProps from '../../../hooks/useMutationProps'
 import AddPokerTemplateScaleMutation from '../../../mutations/AddPokerTemplateScaleMutation'
 import RemovePokerTemplateScaleMutation from '../../../mutations/RemovePokerTemplateScaleMutation'
 import {Threshold} from '../../../types/constEnums'
-import {ScaleActions_scale$key} from '../../../__generated__/ScaleActions_scale.graphql'
 
 const CloneAndDelete = styled('div')({
   display: 'flex',
@@ -19,10 +19,11 @@ interface Props {
   scale: ScaleActions_scale$key
   scaleCount: number
   teamId: string
+  closeMenu: () => void
 }
 
 const ScaleActions = (props: Props) => {
-  const {scale: scaleRef, scaleCount, teamId} = props
+  const {scale: scaleRef, scaleCount, teamId, closeMenu} = props
   const scale = useFragment(
     graphql`
       fragment ScaleActions_scale on TemplateScale {
@@ -51,6 +52,7 @@ const ScaleActions = (props: Props) => {
         {onError, onCompleted}
       )
     }
+    closeMenu()
   }
   const editScale = () => {
     commitLocalUpdate(atmosphere, (store) => {

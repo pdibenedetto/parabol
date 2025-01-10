@@ -1,16 +1,13 @@
 import styled from '@emotion/styled'
 import {Receipt} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {useFragment} from 'react-relay'
-import {Link} from 'react-router-dom'
 import {InvoiceRow_invoice$key} from '~/__generated__/InvoiceRow_invoice.graphql'
 import Row from '../../../../components/Row/Row'
 import RowInfo from '../../../../components/Row/RowInfo'
 import RowInfoHeading from '../../../../components/Row/RowInfoHeading'
 import {PALETTE} from '../../../../styles/paletteV3'
 import makeDateString from '../../../../utils/makeDateString'
-import makeMonthString from '../../../../utils/makeMonthString'
 import invoiceLineFormat from '../../../invoice/helpers/invoiceLineFormat'
 
 const InvoiceAmount = styled('span')({
@@ -43,17 +40,6 @@ const InfoRowRight = styled('div')({
   textAlign: 'right'
 })
 
-const LinkStyles = styled('div')({
-  color: PALETTE.SLATE_700,
-  alignItems: 'flex-start',
-  display: 'flex',
-  justifyContent: 'space-between',
-  textDecoration: 'none',
-  width: '100%'
-})
-
-const RowLink = LinkStyles.withComponent(Link)
-
 const StyledDate = styled('span')<{styledToPay?: boolean; styledPaid?: boolean}>(
   ({styledToPay, styledPaid}) => ({
     fontSize: 13,
@@ -70,69 +56,62 @@ const PayURL = styled('a')({
 interface Props {
   invoice: InvoiceRow_invoice$key
 }
+
 const InvoiceRow = (props: Props) => {
   const {invoice: invoiceRef} = props
   const invoice = useFragment(
     graphql`
       fragment InvoiceRow_invoice on Invoice {
         id
-        amountDue
-        creditCard {
-          brand
-        }
-        endAt
-        paidAt
+        periodEndAt
+        total
         payUrl
         status
       }
     `,
     invoiceRef
   )
-  const {id: invoiceId, amountDue, creditCard, endAt, paidAt, payUrl, status} = invoice
+  const {periodEndAt, total, payUrl, status} = invoice
   const isEstimate = status === 'UPCOMING'
+
   return (
     <Row>
-      <RowLink rel='noopener noreferrer' target='_blank' to={`/invoice/${invoiceId}`}>
+      <a
+        href={payUrl}
+        target='_blank'
+        rel='noopener noreferrer'
+        className='flex w-full flex-row items-center justify-between text-slate-700 no-underline'
+      >
         <FileIcon isEstimate={isEstimate} />
         <InvoiceInfo>
           <InfoRow>
-            <InvoiceTitle>{makeMonthString(endAt)}</InvoiceTitle>
+            <InvoiceTitle>
+              {status === 'UPCOMING'
+                ? `Due on ${makeDateString(periodEndAt)}`
+                : `${makeDateString(periodEndAt)}`}
+            </InvoiceTitle>
             <InfoRowRight>
               <InvoiceAmount>
                 {isEstimate && '*'}
-                {invoiceLineFormat(amountDue)}
+                {invoiceLineFormat(total)}
               </InvoiceAmount>
             </InfoRowRight>
           </InfoRow>
           <InfoRow>
             {status === 'UPCOMING' && (
-              <StyledDate styledToPay>
-                {isEstimate && '*Current estimate. '}
-                {creditCard
-                  ? `Card will be charged on ${makeDateString(endAt)}`
-                  : `Make sure to add billing info before ${makeDateString(endAt)}!`}
-              </StyledDate>
+              <StyledDate styledToPay>{isEstimate && '*Current estimate. '}</StyledDate>
             )}
-            {status === 'PAID' && (
-              <StyledDate styledPaid>
-                {'Paid on '}
-                {makeDateString(paidAt)}
-              </StyledDate>
-            )}
+            {status === 'PAID' && <StyledDate styledPaid>{'Paid'}</StyledDate>}
             {status !== 'PAID' && status !== 'UPCOMING' && (
               <StyledDate styledPaid={status === 'PENDING'}>
-                {payUrl ? (
-                  <PayURL rel='noopener noreferrer' target='_blank' href={payUrl}>
-                    {'PAY NOW'}
-                  </PayURL>
-                ) : (
-                  `Status: ${status}`
-                )}
+                <PayURL rel='noopener noreferrer' target='_blank' href={payUrl}>
+                  {'PAY NOW'}
+                </PayURL>
               </StyledDate>
             )}
           </InfoRow>
         </InvoiceInfo>
-      </RowLink>
+      </a>
     </Row>
   )
 }

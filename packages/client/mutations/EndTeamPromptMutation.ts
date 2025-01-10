@@ -1,8 +1,9 @@
 import graphql from 'babel-plugin-relay/macro'
 import {commitMutation} from 'react-relay'
 import {RecordProxy} from 'relay-runtime'
+import {EndTeamPromptMutation_team$data} from '~/__generated__/EndTeamPromptMutation_team.graphql'
 import onMeetingRoute from '~/utils/onMeetingRoute'
-import {EndTeamPromptMutation_team} from '~/__generated__/EndTeamPromptMutation_team.graphql'
+import {EndTeamPromptMutation as TEndTeamPromptMutation} from '../__generated__/EndTeamPromptMutation.graphql'
 import {
   HistoryMaybeLocalHandler,
   OnNextHandler,
@@ -10,7 +11,6 @@ import {
   SharedUpdater,
   StandardMutation
 } from '../types/relayMutations'
-import {EndTeamPromptMutation as TEndTeamPromptMutation} from '../__generated__/EndTeamPromptMutation.graphql'
 import handleAddTimelineEvent from './handlers/handleAddTimelineEvent'
 
 graphql`
@@ -31,12 +31,15 @@ graphql`
       }
     }
     timelineEvent {
-      id
-      team {
-        id
-        name
-      }
-      type
+      ...TimelineEventTeamPromptComplete_timelineEvent @relay(mask: false)
+    }
+  }
+`
+
+graphql`
+  fragment EndTeamPromptMutation_meeting on EndTeamPromptSuccess {
+    meeting {
+      ...WholeMeetingSummary_meeting
     }
   }
 `
@@ -50,12 +53,13 @@ const mutation = graphql`
         }
       }
       ...EndTeamPromptMutation_team @relay(mask: false)
+      ...EndTeamPromptMutation_meeting @relay(mask: false)
     }
   }
 `
 
 export const endTeamPromptTeamOnNext: OnNextHandler<
-  EndTeamPromptMutation_team,
+  EndTeamPromptMutation_team$data,
   OnNextHistoryContext
 > = (payload, context) => {
   const {meeting} = payload
@@ -67,7 +71,7 @@ export const endTeamPromptTeamOnNext: OnNextHandler<
   }
 }
 
-export const endTeamPromptTeamUpdater: SharedUpdater<EndTeamPromptMutation_team> = (
+export const endTeamPromptTeamUpdater: SharedUpdater<EndTeamPromptMutation_team$data> = (
   payload,
   {store}
 ) => {

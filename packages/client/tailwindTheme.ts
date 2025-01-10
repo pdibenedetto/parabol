@@ -1,12 +1,15 @@
 /**
  * Palette definition from https://www.figma.com/file/OA9NkpSTlHVqqRL9IE9KsF/Palette-v3?node-id=15%3A2184&t=waDBAOGfSqB0wtCc-0
  */
+const defaultColors = require('tailwindcss/colors')
 
 export default {
   theme: {
     colors: {
-      white: '#FFFFFF',
-      black: '#000000',
+      transparent: 'transparent',
+      current: 'currentColor',
+      black: defaultColors.black,
+      white: defaultColors.white,
       primary: '#493272',
       tomato: {
         '100': '#FFE2E0',
@@ -150,7 +153,53 @@ export default {
         '700': '#444258',
         '800': '#2D2D39',
         '900': '#1C1C21'
+      },
+      'success-light': '#2db553',
+      starter: '#F2E1F7',
+      team: '#CBECF0',
+      enterprise: '#FFE2E0'
+    },
+    keyframes: {
+      overlayShow: {
+        from: {opacity: 0},
+        to: {opacity: 1}
+      },
+      contentShow: {
+        from: {opacity: 0, transform: 'translate(-50%, -50%) translateY(32px) scale(0.96)'}
+      },
+      scaleIn: {
+        from: {
+          opacity: 0,
+          transform: 'scale(0)'
+        }
+      },
+      slideUp: {
+        from: {
+          opacity: 0,
+          transform: 'translateY(10px)'
+        },
+        to: {
+          opacity: 1,
+          transform: 'translateY(0)'
+        }
+      },
+      slideDown: {
+        from: {
+          opacity: 0,
+          transform: 'translateY(-10px)'
+        },
+        to: {
+          opacity: 1,
+          transform: 'translateY(0)'
+        }
       }
+    },
+    animation: {
+      overlayShow: 'overlayShow 150ms cubic-bezier(0.16, 1, 0.3, 1)',
+      contentShow: 'contentShow 150ms cubic-bezier(0.16, 1, 0.3, 1)',
+      scaleIn: 'scaleIn 150ms cubic-bezier(0, 0, .2, 1)',
+      slideUp: 'slideUp 200ms cubic-bezier(0, 0, 0.2, 1)',
+      slideDown: 'slideDown 200ms cubic-bezier(0, 0, 0.2, 1)'
     }
   }
 } as const

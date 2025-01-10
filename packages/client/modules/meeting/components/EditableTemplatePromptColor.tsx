@@ -1,12 +1,11 @@
 import styled from '@emotion/styled'
 import {ArrowDropDown as ArrowDropDownIcon} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {useFragment} from 'react-relay'
-import PlainButton from '~/components/PlainButton/PlainButton'
-import {BezierCurve} from '~/types/constEnums'
 import {EditableTemplatePromptColor_prompt$key} from '~/__generated__/EditableTemplatePromptColor_prompt.graphql'
 import {EditableTemplatePromptColor_prompts$key} from '~/__generated__/EditableTemplatePromptColor_prompts.graphql'
+import PlainButton from '~/components/PlainButton/PlainButton'
+import {BezierCurve} from '~/types/constEnums'
 import PalettePicker from '../../../components/PalettePicker/PalettePicker'
 import {MenuPosition} from '../../../hooks/useCoords'
 import useMenu from '../../../hooks/useMenu'
@@ -77,8 +76,7 @@ const EditableTemplatePromptColor = (props: Props) => {
   )
   const {groupColor} = prompt
   const {menuProps, menuPortal, originRef, togglePortal} = useMenu<HTMLButtonElement>(
-    MenuPosition.UPPER_LEFT,
-    {parentId: 'templateModal'}
+    MenuPosition.UPPER_LEFT
   )
   return (
     <PromptColor ref={originRef} isOwner={isOwner} onClick={isOwner ? togglePortal : undefined}>

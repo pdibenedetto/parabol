@@ -1,5 +1,5 @@
 import styled from '@emotion/styled'
-import React, {ReactElement, ReactNode, ReactPortal, Ref, Suspense, useEffect} from 'react'
+import {ReactElement, ReactNode, ReactPortal, Ref, Suspense, useEffect} from 'react'
 import ErrorBoundary from '../components/ErrorBoundary'
 import LoadingComponent from '../components/LoadingComponent/LoadingComponent'
 import ModalError from '../components/ModalError'
@@ -16,7 +16,7 @@ const ModalBlock = styled('div')({
   justifyContent: 'center',
   left: 0,
   // no margins or paddings since they could force it too low & cause a scrollbar to appear
-  position: 'absolute',
+  position: 'fixed',
   top: 0,
   width: '100%',
   zIndex: ZIndex.DIALOG,

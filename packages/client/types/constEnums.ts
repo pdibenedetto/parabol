@@ -15,7 +15,8 @@ export const enum AppBar {
 
 export const enum AuthIdentityTypeEnum {
   LOCAL = 'LOCAL',
-  GOOGLE = 'GOOGLE'
+  GOOGLE = 'GOOGLE',
+  MICROSOFT = 'MICROSOFT'
 }
 
 // https://github.com/material-components/material-components-web/blob/4844330e7836d9dc97798b47594ff0dbaac51227/packages/mdc-animation/_variables.scss
@@ -33,7 +34,6 @@ export const enum BezierCurve {
 }
 
 export const enum Breakpoint {
-  INVOICE = 512,
   SIDEBAR_LEFT = 1024,
   NEW_MEETING_GRID = 1112,
   NEW_MEETING_SELECTOR = 500,
@@ -42,7 +42,7 @@ export const enum Breakpoint {
   DASH_BREAKPOINT_WIDEST = 1816, // (4*296) + (5*24) + (256*2) = 4 card cols, 4 col gutters, 2 sidebars
   VOTE_PHASE = 800,
   FUZZY_TABLET = 700,
-  BIG_DISPLAY = 1900
+  ORG_DRAWER = 1680
 }
 
 export const enum Card {
@@ -95,8 +95,9 @@ export const enum Duration {
 }
 
 export const enum ElementWidth {
-  CONTROL_BAR_BUTTON = 90,
+  CONTROL_BAR_BUTTON = 96,
   CONTROL_BAR_PADDING = 8,
+  BILLING_AVATAR = 44,
   DASHBOARD_AVATAR = 28,
   DASHBOARD_AVATAR_OVERLAPPED = 20,
   REFLECTION_CARD = 296,
@@ -122,6 +123,7 @@ export const enum ElementHeight {
 
 export const enum ExternalLinks {
   EMAIL_CDN = 'https://action-files.parabol.co/static/email/',
+  LOGO = 'https://action-files.parabol.co/static/favicon-with-more-padding.jpeg',
   PRICING_LINK = 'https://www.parabol.co/pricing/',
   GETTING_STARTED_RETROS = 'https://www.parabol.co/resources/retrospective-meetings',
   GETTING_STARTED_RETRO_VIDEO = 'https://www.parabol.co/resources/retrospective-meetings/#video',
@@ -137,6 +139,7 @@ export const enum ExternalLinks {
   INTEGRATIONS_SLACK = 'https://www.parabol.co/integrations/slack',
   INTEGRATIONS_MSTEAMS = 'https://www.parabol.co/integrations/msteams',
   INTEGRATIONS_SUPPORT_JIRA = 'https://www.parabol.co/integrations/jira',
+  INTEGRATIONS_SUPPORT_JIRA_AUTHORIZATION = 'https://www.parabol.co/support/authorization-issues-jira-integration',
   INTEGRATIONS_SUPPORT_JIRA_MISSING_FIELD_TEAM_MANAGED = 'https://www.parabol.co/support/estimation-in-jira-team',
   INTEGRATIONS_SUPPORT_JIRA_MISSING_FIELD_COMPANY_MANAGED = 'https://www.parabol.co/support/estimation-in-jira-company',
   INTEGRATIONS_SUPPORT_GITHUB = 'https://www.parabol.co/integrations/github',
@@ -157,6 +160,10 @@ export const enum Filter {
   BENEATH_DIALOG = 'blur(1.5px)'
 }
 
+export const enum GlobalBanner {
+  HEIGHT = 24
+}
+
 export const enum Gutters {
   COLUMN_INNER_GUTTER = '12px',
   DASH_GUTTER = '20px',
@@ -168,7 +175,8 @@ export const enum Gutters {
 export const enum InvitationTokenError {
   NOT_FOUND = 'notFound',
   EXPIRED = 'expired',
-  ALREADY_ACCEPTED = 'accepted'
+  ALREADY_ACCEPTED = 'accepted',
+  NOT_SIGNED_IN = 'notSignedIn'
 }
 export const enum InvoiceItemType {
   ADD_USER = 'addUser',
@@ -185,6 +193,7 @@ export const enum Layout {
   LAYOUT_GRID = 8, // 1x
   ROW_GUTTER = 16, // 2x
   SETTINGS_MAX_WIDTH = 768,
+  SETTINGS_NARROW_MAX_WIDTH = 644,
   TASK_COLUMNS_MAX_WIDTH = 1360
 }
 
@@ -215,6 +224,7 @@ export const enum AuthenticationError {
   EXCEEDED_RESET_THRESHOLD = 'exceededResetThreshold',
   USER_NOT_FOUND = 'userNotFound',
   USER_EXISTS_GOOGLE = 'userExistsGoogle',
+  USER_EXISTS_MICROSOFT = 'userExistsMicrosoft',
   USER_EXISTS_SAML = 'userExistsSaml'
 }
 
@@ -247,9 +257,10 @@ export const enum PokerCards {
   AVATAR_WIDTH = 46,
   AVATAR_BORDER = 3
 }
-export const enum UserTaskViewFilterLabels {
+export const enum FilterLabels {
   ALL_TEAMS = 'All Teams',
-  ALL_TEAM_MEMBERS = 'All Team Members'
+  ALL_TEAM_MEMBERS = 'All Team Members',
+  ALL_EVENTS = 'All Events'
 }
 
 export const enum MeetingSettingsThreshold {
@@ -267,9 +278,9 @@ export const enum MeetingTypes {
 export const enum NavSidebar {
   FONT_SIZE = 14,
   LEFT_BORDER_WIDTH = '3px',
-  LINE_HEIGHT = '24px',
+  LINE_HEIGHT = '22px',
   SUB_FONT_SIZE = 14,
-  SUB_LINE_HEIGHT = '24px',
+  SUB_LINE_HEIGHT = '22px',
   WIDTH = 256
 }
 
@@ -283,19 +294,21 @@ export const enum Pricing {
 
 export const enum Providers {
   ATLASSIAN_NAME = 'Atlassian',
-  ATLASSIAN_DESC = 'Use Jira Cloud Issues from within Parabol',
-  JIRA_SERVER_NAME = 'Jira Server',
-  JIRA_SERVER_DESC = 'Use Jira Server Issues from within Parabol',
+  ATLASSIAN_DESC = 'Use Jira Cloud Issues from within Parabol.',
+  JIRA_SERVER_NAME = 'Jira Data Center',
+  JIRA_SERVER_DESC = 'Use Jira Data Center Issues from within Parabol.',
   GITHUB_NAME = 'GitHub',
-  GITHUB_DESC = 'Use GitHub Issues from within Parabol',
-  GITHUB_SCOPE = 'admin:org_hook,read:org,repo,user,write:repo_hook',
+  GCAL_NAME = 'Google Calendar',
+  GCAL_DESC = 'Create Google Calendar events from within Parabol.',
+  GITHUB_DESC = 'Use GitHub Issues from within Parabol.',
+  GITHUB_SCOPE = 'read:org,repo',
   GITLAB_SCOPE = 'api',
   MATTERMOST_NAME = 'Mattermost',
-  MATTERMOST_DESC = 'Push notifications to Mattermost',
+  MATTERMOST_DESC = 'Push notifications to Mattermost.',
   SLACK_NAME = 'Slack',
-  SLACK_DESC = 'Push notifications to Slack',
+  SLACK_DESC = 'Push notifications to Slack.',
   AZUREDEVOPS_NAME = 'Azure DevOps',
-  AZUREDEVOPS_DESC = 'Use Azure DevOps Issues from within Parabol',
+  AZUREDEVOPS_DESC = 'Use Azure DevOps Issues from within Parabol.',
   MSTEAMS_NAME = 'Microsoft Teams',
   MSTEAMS_DESC = 'Push notifications to Microsoft Teams'
 }
@@ -377,7 +390,7 @@ export const enum Threshold {
   MASS_INVITATION_TOKEN_LIFESPAN = 2592000000, // 30 days
   TEAM_INVITATION_LIFESPAN = 2592000000, // 30 days
   FINAL_WARNING_DAYS_BEFORE_LOCK = 7,
-  MAX_FREE_TEAMS = 10,
+  MAX_FREE_TEAMS = 100,
   MAX_ACCOUNT_PASSWORD_ATTEMPTS = 10,
   MAX_ACCOUNT_DAILY_PASSWORD_RESETS = 3,
   MAX_AVATAR_FILE_SIZE = 1024 * 1024,
@@ -387,8 +400,7 @@ export const enum Threshold {
   MAX_POKER_TEMPLATE_DIMENSIONS = 12,
   MAX_POKER_TEMPLATE_SCALES = 12,
   MAX_POKER_SCALE_VALUES = 30,
-  MAX_RETRO_TEAM_TEMPLATES = 20,
-  MAX_POKER_TEAM_TEMPLATES = 20,
+  POKER_SCALE_VALUE_MAX_LENGTH = 3,
   MAX_POKER_DIMENSION_NAME = 50,
   MAX_QUAL_AI_MEETINGS = 3,
   MAX_REACTJIS = 12,
@@ -397,12 +409,22 @@ export const enum Threshold {
   MAX_INTEGRATION_FETCH_TIME = 10000,
   MIN_STICKY_TEAM_MEETING_ATTENDEES = 2,
   MIN_STICKY_TEAM_MEETINGS = 3,
+  STICKY_TEAM_LAST_MEETING_TIMEFRAME = 2592000, // 30 days
   STARTER_TIER_LOCK_AFTER_DAYS = 30,
   REFRESH_JWT_AFTER = 1296000000, // 15 days
   RESET_PASSWORD_LIFESPAN = 86400000, // 1 day
   VERIFY_TOKEN_LIFESPAN = 2592000000, // 30 days
   UPCOMING_INVOICE_EMAIL_WARNING = 345600000, // 4 days
   UPCOMING_INVOICE_TIME_VALID = 120000 // 2 minutes
+}
+
+// Use these values for easier testing of team limits and usage stats
+export const enum ThresholdTest {
+  MIN_STICKY_TEAM_MEETING_ATTENDEES = 0,
+  MIN_STICKY_TEAM_MEETINGS = 0,
+  MAX_STARTER_TIER_TEAMS = 0,
+  STARTER_TIER_LOCK_AFTER_DAYS = 0,
+  STICKY_TEAM_LAST_MEETING_TIMEFRAME = 2592000
 }
 
 export const enum Times { // ms
@@ -470,7 +492,11 @@ export const enum SprintPokerDefaults {
   GITHUB_DEFAULT_QUERY = 'is:issue is:open sort:updated involves:@me',
   JIRA_FIELD_UPDATE_ERROR = 'Couldn’t fix the missing field! In Jira, use "Find my field" to determine the error',
   JIRA_FIELD_UPDATE_ERROR_ESTIMATION = 'Please enable estimation feature in your Jira project settings',
-  JIRA_FIELD_UPDATE_ERROR_ESTIMATION_TIMETRACKING = 'Please enable estimation feature in your Jira project settings and add Time tracking field to the issue type'
+  JIRA_FIELD_UPDATE_ERROR_ESTIMATION_TIMETRACKING = 'Please enable estimation feature in your Jira project settings and add Time tracking field to the issue type',
+  GITLAB_FIELD_TIME_ESTIMATE = '__timeEstimate',
+  GITLAB_FIELD_TIME_ESTIMATE_LABEL = 'Time Estimate',
+  GITLAB_FIELD_WEIGHT = '__weight',
+  GITLAB_FIELD_WEIGHT_LABEL = 'Weight'
 }
 
 export const enum AriaLabels {
@@ -503,5 +529,7 @@ export const enum AIExplainer {
 
 export const enum EmptyMeetingViewMessage {
   NO_ACTIVE_MEETINGS = `Looks like you have no upcoming meetings 😎 Start one now or check out these tips and tricks.`,
-  NO_SEARCH_RESULTS = `Sorry we could not find any meetings matched with your query. Would you like to checkout these tips and tricks?`
+  NO_SEARCH_RESULTS = `Sorry, we could not find any meetings that matched with your query. Would you like to checkout these tips and tricks?`,
+  NO_ACTIVE_MEETINGS_ON_THE_TEAM = `Looks like you have no upcoming meetings on this team.`,
+  NO_SEARCH_RESULTS_ON_THE_TEAM = `Sorry, we could not find any meetings that matched with your query on this team.`
 }

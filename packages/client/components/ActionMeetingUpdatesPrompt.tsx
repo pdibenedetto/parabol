@@ -1,10 +1,8 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {useFragment} from 'react-relay'
-import ActionMeetingUpdatesPromptTeamHelpText from '../modules/meeting/components/ActionMeetingUpdatesPromptTeamHelpText'
-import defaultUserAvatar from '../styles/theme/images/avatar-user.svg'
 import {ActionMeetingUpdatesPrompt_meeting$key} from '../__generated__/ActionMeetingUpdatesPrompt_meeting.graphql'
+import ActionMeetingUpdatesPromptTeamHelpText from '../modules/meeting/components/ActionMeetingUpdatesPromptTeamHelpText'
 import Avatar from './Avatar/Avatar'
 import PhaseHeaderDescription from './PhaseHeaderDescription'
 import PhaseHeaderTitle from './PhaseHeaderTitle'
@@ -26,11 +24,14 @@ const PromptText = styled('div')({
 
 const StyledHeader = styled(PhaseHeaderTitle)({
   fontSize: 18,
-  overflowWrap: 'break-word',
-  width: '55vw'
+  overflowWrap: 'break-word'
 })
 
-const getQuestion = (isConnected: boolean | null, taskCount: number, preferredName: string) => {
+const getQuestion = (
+  isConnected: boolean | null | undefined,
+  taskCount: number,
+  preferredName: string
+) => {
   if (isConnected) {
     return taskCount > 0 ? 'what’s changed with your tasks?' : 'what are you working on?'
   }
@@ -90,9 +91,9 @@ const ActionMeetingUpdatesPrompt = (props: Props) => {
   const taskCount = tasks.edges.length
   return (
     <StyledPrompt>
-      <Avatar picture={picture || defaultUserAvatar} size={64} />
+      <Avatar picture={picture} className={'h-16 w-16'} />
       <PromptText>
-        <StyledHeader>
+        <StyledHeader className='max-w-full'>
           {prefix}
           <i>{getQuestion(isConnected, taskCount, preferredName)}</i>
         </StyledHeader>

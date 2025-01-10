@@ -35,12 +35,27 @@ interface IntegrationProviderPAT extends IntegrationProviderActive {
   clientId: string
 }
 
-export interface IntegrationProviderMattermost extends Omit<IntegrationProviderWebhook, 'scope'> {
+export interface IntegrationProviderMattermostPlugin extends IntegrationProviderActive {
+  service: 'mattermost'
+  authStrategy: 'sharedSecret'
+  serverBaseUrl: string
+  sharedSecret: string
+}
+
+export interface IntegrationProviderMattermostWebhook
+  extends Omit<IntegrationProviderWebhook, 'scope'> {
   service: 'mattermost'
   scope: Omit<IntegrationProviderScopeEnum, 'global'>
   scopeGlobal: false
 }
 
+export type IntegrationProviderMattermost =
+  | IntegrationProviderMattermostPlugin
+  | IntegrationProviderMattermostWebhook
+
+export interface IntegrationProviderGcalOAuth2 extends IntegrationProviderOAuth2 {
+  service: 'gcal'
+}
 export interface IntegrationProviderGitLabOAuth2 extends IntegrationProviderOAuth2 {
   service: 'gitlab'
 }
@@ -68,6 +83,7 @@ export type TIntegrationProvider =
   | IntegrationProviderJiraServer
   | IntegrationProviderAzureDevOps
   | IntegrationProviderMSTeams
+  | IntegrationProviderGcalOAuth2
 
 const getIntegrationProvidersByIds = async <T = TIntegrationProvider>(ids: readonly number[]) => {
   const providers = await getIntegrationProvidersByIdsQuery.run({ids}, getPg())

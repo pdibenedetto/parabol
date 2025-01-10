@@ -1,10 +1,12 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
-import {createFragmentContainer} from 'react-relay'
-import {AgendaListAndInput_meeting} from '~/__generated__/AgendaListAndInput_meeting.graphql'
+import {useFragment} from 'react-relay'
+import {
+  AgendaListAndInput_meeting$data,
+  AgendaListAndInput_meeting$key
+} from '~/__generated__/AgendaListAndInput_meeting.graphql'
+import {AgendaListAndInput_team$key} from '../../../../__generated__/AgendaListAndInput_team.graphql'
 import useGotoStageId from '../../../../hooks/useGotoStageId'
-import {AgendaListAndInput_team} from '../../../../__generated__/AgendaListAndInput_team.graphql'
 import AgendaInput from '../AgendaInput/AgendaInput'
 import AgendaList from '../AgendaList/AgendaList'
 
@@ -32,11 +34,11 @@ interface Props {
   dashSearch?: string
   gotoStageId?: ReturnType<typeof useGotoStageId>
   isDisabled?: boolean
-  meeting: AgendaListAndInput_meeting | null
-  team: AgendaListAndInput_team
+  meeting: AgendaListAndInput_meeting$key | null
+  team: AgendaListAndInput_team$key
 }
 
-const getAgendaItems = (meeting: AgendaListAndInput_meeting | null) => {
+const getAgendaItems = (meeting: AgendaListAndInput_meeting$data | null | undefined) => {
   if (!meeting) return null
   const agendaItemsPhase = meeting.phases!.find((phase) => phase.phaseType === 'agendaitems')
   if (!agendaItemsPhase?.stages) return null
@@ -44,7 +46,32 @@ const getAgendaItems = (meeting: AgendaListAndInput_meeting | null) => {
 }
 
 const AgendaListAndInput = (props: Props) => {
-  const {dashSearch, gotoStageId, isDisabled, team, meeting} = props
+  const {dashSearch, gotoStageId, isDisabled, team: teamRef, meeting: meetingRef} = props
+  const team = useFragment(
+    graphql`
+      fragment AgendaListAndInput_team on Team {
+        ...AgendaInput_team
+        agendaItems {
+          id
+          content
+          ...AgendaList_agendaItems
+        }
+      }
+    `,
+    teamRef
+  )
+  const meeting = useFragment(
+    graphql`
+      fragment AgendaListAndInput_meeting on ActionMeeting {
+        ...AgendaList_meeting
+        endedAt
+        phases {
+          ...AgendaListAndInputAgendaItemPhase @relay(mask: false)
+        }
+      }
+    `,
+    meetingRef
+  )
   const endedAt = meeting?.endedAt
   const agendaItems = getAgendaItems(meeting) || team.agendaItems
 
@@ -77,25 +104,4 @@ graphql`
   }
 `
 
-export default createFragmentContainer(AgendaListAndInput, {
-  team: graphql`
-    fragment AgendaListAndInput_team on Team {
-      ...AgendaInput_team
-      agendaItems {
-        id
-        content
-        sortOrder
-        ...AgendaList_agendaItems
-      }
-    }
-  `,
-  meeting: graphql`
-    fragment AgendaListAndInput_meeting on ActionMeeting {
-      ...AgendaList_meeting
-      endedAt
-      phases {
-        ...AgendaListAndInputAgendaItemPhase @relay(mask: false)
-      }
-    }
-  `
-})
+export default AgendaListAndInput

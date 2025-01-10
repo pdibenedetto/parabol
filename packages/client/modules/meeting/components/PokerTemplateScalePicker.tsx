@@ -1,8 +1,8 @@
 import styled from '@emotion/styled'
 import {ExpandMore} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {useFragment} from 'react-relay'
+import {PokerTemplateScalePicker_dimension$key} from '../../../__generated__/PokerTemplateScalePicker_dimension.graphql'
 import {MenuPosition} from '../../../hooks/useCoords'
 import useMenu from '../../../hooks/useMenu'
 import useTooltip from '../../../hooks/useTooltip'
@@ -10,7 +10,6 @@ import textOverflow from '../../../styles/helpers/textOverflow'
 import {PALETTE} from '../../../styles/paletteV3'
 import {FONT_FAMILY} from '../../../styles/typographyV2'
 import lazyPreload from '../../../utils/lazyPreload'
-import {PokerTemplateScalePicker_dimension$key} from '../../../__generated__/PokerTemplateScalePicker_dimension.graphql'
 
 const SelectScaleDropdown = lazyPreload(
   () =>
@@ -29,17 +28,19 @@ const DropdownIcon = styled(ExpandMore)({
   width: 18
 })
 
-const DropdownBlock = styled('div')<{disabled: boolean}>(({disabled}) => ({
-  background: disabled ? PALETTE.SLATE_200 : '#fff',
-  border: `1px solid ${PALETTE.SLATE_400}`,
-  borderRadius: '30px',
-  cursor: disabled ? 'not-allowed' : 'pointer',
-  display: 'flex',
-  fontSize: 13,
-  lineHeight: '20px',
-  minWidth: 144,
-  userSelect: 'none'
-}))
+const DropdownBlock = styled('div')<{disabled: boolean; readOnly: boolean}>(
+  ({disabled, readOnly}) => ({
+    background: disabled && !readOnly ? PALETTE.SLATE_200 : '#fff',
+    border: readOnly ? undefined : `1px solid ${PALETTE.SLATE_400}`,
+    borderRadius: '30px',
+    cursor: readOnly ? undefined : disabled ? 'not-allowed' : 'pointer',
+    display: 'flex',
+    fontSize: 13,
+    lineHeight: '20px',
+    minWidth: 144,
+    userSelect: 'none'
+  })
+)
 
 const MenuToggleInner = styled('div')({
   alignItems: 'center',
@@ -62,10 +63,11 @@ const MenuToggleLabel = styled('div')({
 interface Props {
   dimension: PokerTemplateScalePicker_dimension$key
   isOwner: boolean
+  readOnly?: boolean
 }
 
 const PokerTemplateScalePicker = (props: Props) => {
-  const {dimension: dimensionRef, isOwner} = props
+  const {dimension: dimensionRef, isOwner, readOnly} = props
   const dimension = useFragment(
     graphql`
       fragment PokerTemplateScalePicker_dimension on TemplateDimension {
@@ -84,7 +86,6 @@ const PokerTemplateScalePicker = (props: Props) => {
     {
       isDropdown: true,
       id: 'scaleDropdown',
-      parentId: 'templateModal',
       loadingWidth: 300
     }
   )
@@ -94,14 +95,15 @@ const PokerTemplateScalePicker = (props: Props) => {
     closeTooltip,
     originRef: tooltipRef
   } = useTooltip<HTMLDivElement>(MenuPosition.LOWER_CENTER, {
-    disabled: isOwner
+    disabled: isOwner || readOnly
   })
   return (
     <>
       <DropdownBlock
         onMouseEnter={SelectScaleDropdown.preload}
-        onClick={isOwner ? togglePortal : undefined}
+        onClick={isOwner && !readOnly ? togglePortal : undefined}
         disabled={!isOwner}
+        readOnly={!!readOnly}
         ref={isOwner ? originRef : tooltipRef}
         onMouseOver={openTooltip}
         onMouseLeave={closeTooltip}
@@ -109,7 +111,7 @@ const PokerTemplateScalePicker = (props: Props) => {
         <MenuToggleInner>
           <MenuToggleLabel>{selectedScale.name}</MenuToggleLabel>
         </MenuToggleInner>
-        <DropdownIcon />
+        {!readOnly && <DropdownIcon />}
       </DropdownBlock>
       {menuPortal(<SelectScaleDropdown menuProps={menuProps} dimension={dimension} />)}
       {tooltipPortal(<div>Must be the template owner to change</div>)}

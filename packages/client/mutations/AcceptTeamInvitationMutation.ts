@@ -1,8 +1,10 @@
 import graphql from 'babel-plugin-relay/macro'
 import {commitMutation} from 'react-relay'
+import {AcceptTeamInvitationMutation_notification$data} from '~/__generated__/AcceptTeamInvitationMutation_notification.graphql'
 import {InvitationTokenError, LOCKED_MESSAGE} from '~/types/constEnums'
-import {AcceptTeamInvitationMutation_notification} from '~/__generated__/AcceptTeamInvitationMutation_notification.graphql'
 import Atmosphere from '../Atmosphere'
+import {AcceptTeamInvitationMutation as TAcceptTeamInvitationMutation} from '../__generated__/AcceptTeamInvitationMutation.graphql'
+import {AcceptTeamInvitationMutation_team$data} from '../__generated__/AcceptTeamInvitationMutation_team.graphql'
 import {
   HistoryMaybeLocalHandler,
   OnNextHandler,
@@ -11,8 +13,6 @@ import {
 } from '../types/relayMutations'
 import fromTeamMemberId from '../utils/relay/fromTeamMemberId'
 import getGraphQLError from '../utils/relay/getGraphQLError'
-import {AcceptTeamInvitationMutation as TAcceptTeamInvitationMutation} from '../__generated__/AcceptTeamInvitationMutation.graphql'
-import {AcceptTeamInvitationMutation_team} from '../__generated__/AcceptTeamInvitationMutation_team.graphql'
 import handleAddOrganization from './handlers/handleAddOrganization'
 import handleAddTeamMembers from './handlers/handleAddTeamMembers'
 import handleAddTeams from './handlers/handleAddTeams'
@@ -34,11 +34,6 @@ graphql`
     }
     team {
       name
-      organization {
-        id
-        name
-      }
-      ...DashNavListTeam
     }
   }
 `
@@ -55,6 +50,13 @@ graphql`
       activeMeetings {
         id
       }
+      organization {
+        id
+        name
+        ...DashNavList_organization
+      }
+      ...DashNavListTeam
+      ...PublicTeamsFrag_team
     }
     meeting {
       id
@@ -105,21 +107,27 @@ const mutation = graphql`
 `
 
 export const acceptTeamInvitationNotificationUpdater: SharedUpdater<
-  AcceptTeamInvitationMutation_notification
+  AcceptTeamInvitationMutation_notification$data
 > = (payload, {store}) => {
   const team = payload.getLinkedRecord('team')
   if (!team) return
+  const organization = team.getLinkedRecord('organization')
+  handleAddOrganization(organization, store)
   handleAddTeams(team, store)
 
-  // the viewer could have requested the meeting & had it return null
-  const activeMeetings = team.getLinkedRecords('activeMeetings')
   const viewer = store.getRoot().getLinkedRecord('viewer')
   if (viewer) {
+    // if they checked canAccess before, we need to update it
+    viewer.setValue(true, 'canAccess', {entity: 'Team', id: team.getValue('id')})
+
+    // the viewer could have requested the meeting & had it return null
     const requestedMeeting = payload.getLinkedRecord('meeting')
     if (requestedMeeting) {
       const requestedMeetingId = requestedMeeting.getValue('id')
       viewer.setLinkedRecord(requestedMeeting, 'meeting', {meetingId: requestedMeetingId})
+      viewer.setValue(true, 'canAccess', {entity: 'Meeting', id: requestedMeetingId})
     }
+    const activeMeetings = team.getLinkedRecords('activeMeetings')
     activeMeetings.forEach((activeMeeting) => {
       const meetingId = activeMeeting.getValue('id')
       viewer.setLinkedRecord(activeMeeting, 'meeting', {meetingId})
@@ -127,22 +135,16 @@ export const acceptTeamInvitationNotificationUpdater: SharedUpdater<
   }
 }
 
-export const acceptTeamInvitationTeamUpdater: SharedUpdater<AcceptTeamInvitationMutation_team> = (
-  payload,
-  {store}
-) => {
+export const acceptTeamInvitationTeamUpdater: SharedUpdater<
+  AcceptTeamInvitationMutation_team$data
+> = (payload, {store}) => {
   const teamMember = payload.getLinkedRecord('teamMember')
   handleAddTeamMembers(teamMember, store)
-  const team = payload.getLinkedRecord('team')
-  const organization = team.getLinkedRecord('organization')
-  handleAddOrganization(organization, store)
-  handleAddTeams(team, store)
 }
 
-export const acceptTeamInvitationTeamOnNext: OnNextHandler<AcceptTeamInvitationMutation_team> = (
-  payload,
-  {atmosphere}
-) => {
+export const acceptTeamInvitationTeamOnNext: OnNextHandler<
+  AcceptTeamInvitationMutation_team$data
+> = (payload, {atmosphere}) => {
   const {team, teamMember} = payload
   const {viewerId} = atmosphere
   if (!team || !teamMember) return
@@ -174,7 +176,11 @@ export const handleAcceptTeamInvitationErrors = (
 ) => {
   if (acceptTeamInvitation?.error) {
     const {message} = acceptTeamInvitation.error
-    if (message === InvitationTokenError.ALREADY_ACCEPTED) return
+    if (
+      message === InvitationTokenError.ALREADY_ACCEPTED ||
+      message === InvitationTokenError.NOT_SIGNED_IN
+    )
+      return
     atmosphere.eventEmitter.emit('addSnackbar', {
       autoDismiss: 0,
       key: `acceptTeamInvitation:${message}`,
@@ -209,7 +215,10 @@ const AcceptTeamInvitationMutation: StandardMutation<
       const serverError = getGraphQLError(data, errors)
       if (serverError) {
         const message = serverError.message
-        if (message === InvitationTokenError.ALREADY_ACCEPTED) {
+        if (message === InvitationTokenError.NOT_SIGNED_IN) {
+          // if the user follows an invitation link with an invalid auth token, invalidate it
+          atmosphere.setAuthToken(null)
+        } else if (message === InvitationTokenError.ALREADY_ACCEPTED) {
           handleAuthenticationRedirect(acceptTeamInvitation, {
             atmosphere,
             history,

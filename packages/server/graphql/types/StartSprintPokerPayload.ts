@@ -1,8 +1,8 @@
-import {GraphQLID, GraphQLNonNull, GraphQLObjectType} from 'graphql'
+import {GraphQLBoolean, GraphQLID, GraphQLNonNull, GraphQLObjectType} from 'graphql'
 import {GQLContext} from '../graphql'
-import makeMutationPayload from './makeMutationPayload'
 import PokerMeeting from './PokerMeeting'
 import Team from './Team'
+import makeMutationPayload from './makeMutationPayload'
 
 export const StartSprintPokerSuccess = new GraphQLObjectType<any, GQLContext>({
   name: 'StartSprintPokerSuccess',
@@ -24,6 +24,11 @@ export const StartSprintPokerSuccess = new GraphQLObjectType<any, GQLContext>({
     },
     teamId: {
       type: new GraphQLNonNull(GraphQLID)
+    },
+    hasGcalError: {
+      type: new GraphQLNonNull(GraphQLBoolean),
+      description:
+        'True if there was an error creating the Google Calendar event. False if there was no error or no gcalInput was provided.'
     }
   })
 })

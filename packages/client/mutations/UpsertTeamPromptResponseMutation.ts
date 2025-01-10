@@ -1,9 +1,9 @@
 import graphql from 'babel-plugin-relay/macro'
 import {commitMutation} from 'react-relay'
+import {UpsertTeamPromptResponseMutation_meeting$data} from '~/__generated__/UpsertTeamPromptResponseMutation_meeting.graphql'
 import clientTempId from '~/utils/relay/clientTempId'
-import {UpsertTeamPromptResponseMutation_meeting} from '~/__generated__/UpsertTeamPromptResponseMutation_meeting.graphql'
-import {LocalHandlers, SharedUpdater, StandardMutation} from '../types/relayMutations'
 import {UpsertTeamPromptResponseMutation as TUpsertTeamPromptResponseMutation} from '../__generated__/UpsertTeamPromptResponseMutation.graphql'
+import {LocalHandlers, SharedUpdater, StandardMutation} from '../types/relayMutations'
 
 graphql`
   fragment UpsertTeamPromptResponseMutation_meeting on UpsertTeamPromptResponseSuccess {
@@ -15,6 +15,7 @@ graphql`
       plaintextContent
       updatedAt
       createdAt
+      ...TeamPromptResponseEmojis_response
     }
   }
 `
@@ -41,7 +42,7 @@ const mutation = graphql`
 `
 
 export const upsertTeamPromptResponseUpdater: SharedUpdater<
-  UpsertTeamPromptResponseMutation_meeting
+  UpsertTeamPromptResponseMutation_meeting$data
 > = (payload, {store}) => {
   const newResponse = payload.getLinkedRecord('teamPromptResponse')
   const newResponseCreatorId = newResponse.getValue('userId')
@@ -82,7 +83,8 @@ const UpsertTeamPromptResponseMutation: StandardMutation<
         content,
         plaintextContent,
         updatedAt: now,
-        createdAt: !teamPromptResponseId ? now : undefined
+        createdAt: !teamPromptResponseId ? now : undefined,
+        reactjis: []
       }
     }
   }

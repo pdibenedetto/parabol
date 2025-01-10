@@ -1,18 +1,20 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useState} from 'react'
-import {createFragmentContainer} from 'react-relay'
+import {useState} from 'react'
+import {useFragment} from 'react-relay'
 import SwipeableViews from 'react-swipeable-views'
+import {ScopePhaseArea_meeting$key} from '~/__generated__/ScopePhaseArea_meeting.graphql'
 import useBreakpoint from '~/hooks/useBreakpoint'
 import {Breakpoint} from '~/types/constEnums'
-import {ScopePhaseArea_meeting} from '~/__generated__/ScopePhaseArea_meeting.graphql'
 import {Elevation} from '../styles/elevation'
 import {PALETTE} from '../styles/paletteV3'
+import AtlassianClientManager from '../utils/AtlassianClientManager'
+import GitHubClientManager from '../utils/GitHubClientManager'
 import AzureDevOpsSVG from './AzureDevOpsSVG'
 import GitHubSVG from './GitHubSVG'
 import GitLabSVG from './GitLabSVG'
-import JiraServerSVG from './JiraServerSVG'
 import JiraSVG from './JiraSVG'
+import JiraServerSVG from './JiraServerSVG'
 import ParabolLogoSVG from './ParabolLogoSVG'
 import ScopePhaseAreaAzureDevOps from './ScopePhaseAreaAzureDevOps'
 import ScopePhaseAreaGitHub from './ScopePhaseAreaGitHub'
@@ -24,7 +26,7 @@ import Tab from './Tab/Tab'
 import Tabs from './Tabs/Tabs'
 
 interface Props {
-  meeting: ScopePhaseArea_meeting
+  meeting: ScopePhaseArea_meeting$key
 }
 
 const ScopingArea = styled('div')<{isDesktop: boolean}>(({isDesktop}) => ({
@@ -81,24 +83,85 @@ const containerStyle = {height: '100%'}
 const innerStyle = {width: '100%', height: '100%'}
 
 const ScopePhaseArea = (props: Props) => {
-  const {meeting} = props
+  const {meeting: meetingRef} = props
+  const meeting = useFragment(
+    graphql`
+      fragment ScopePhaseArea_meeting on PokerMeeting {
+        ...StageTimerDisplay_meeting
+        ...StageTimerControl_meeting
+        ...ScopePhaseAreaGitHub_meeting
+        ...ScopePhaseAreaGitLab_meeting
+        ...ScopePhaseAreaJira_meeting
+        ...ScopePhaseAreaJiraServer_meeting
+        ...ScopePhaseAreaParabolScoping_meeting
+        ...ScopePhaseAreaAzureDevOps_meeting
+        endedAt
+        localPhase {
+          ...ScopePhaseArea_phase @relay(mask: false)
+        }
+        localStage {
+          isComplete
+        }
+        phases {
+          ...ScopePhaseArea_phase @relay(mask: false)
+        }
+        showSidebar
+        viewerMeetingMember {
+          teamMember {
+            integrations {
+              gitlab {
+                cloudProvider {
+                  clientId
+                }
+                sharedProviders {
+                  clientId
+                }
+              }
+              jiraServer {
+                sharedProviders {
+                  id
+                }
+              }
+              azureDevOps {
+                cloudProvider {
+                  id
+                }
+                sharedProviders {
+                  id
+                }
+              }
+            }
+          }
+        }
+      }
+    `,
+    meetingRef
+  )
   const isDesktop = useBreakpoint(Breakpoint.SIDEBAR_LEFT)
   const {viewerMeetingMember} = meeting
-  const featureFlags = viewerMeetingMember?.user.featureFlags
   const gitlabIntegration = viewerMeetingMember?.teamMember.integrations.gitlab
   const jiraServerIntegration = viewerMeetingMember?.teamMember.integrations.jiraServer
   const azureDevOpsIntegration = viewerMeetingMember?.teamMember.integrations.azureDevOps
   const allowAzureDevOps =
-    (!!azureDevOpsIntegration?.sharedProviders.length || !!azureDevOpsIntegration?.cloudProvider) &&
-    featureFlags?.azureDevOps
+    !!azureDevOpsIntegration?.sharedProviders.length || !!azureDevOpsIntegration?.cloudProvider
   const isGitLabProviderAvailable = !!(
     gitlabIntegration?.cloudProvider?.clientId || gitlabIntegration?.sharedProviders.length
   )
   const allowJiraServer = !!jiraServerIntegration?.sharedProviders.length
 
   const baseTabs = [
-    {icon: <GitHubSVG />, label: 'GitHub', allow: true, Component: ScopePhaseAreaGitHub},
-    {icon: <JiraSVG />, label: 'Jira', allow: true, Component: ScopePhaseAreaJira},
+    {
+      icon: <GitHubSVG />,
+      label: 'GitHub',
+      allow: GitHubClientManager.isAvailable,
+      Component: ScopePhaseAreaGitHub
+    },
+    {
+      icon: <JiraSVG />,
+      label: 'Jira',
+      allow: AtlassianClientManager.isAvailable,
+      Component: ScopePhaseAreaJira
+    },
     {
       icon: <ParabolLogoSVG />,
       label: 'Parabol',
@@ -107,7 +170,7 @@ const ScopePhaseArea = (props: Props) => {
     },
     {
       icon: <JiraServerSVG />,
-      label: 'Jira Server',
+      label: 'Jira Data Center',
       allow: allowJiraServer,
       Component: ScopePhaseAreaJiraServer
     },
@@ -132,7 +195,7 @@ const ScopePhaseArea = (props: Props) => {
     return idx === -1 ? 1 : idx
   })
 
-  const isTabActive = (label: typeof baseTabs[number]['label']) => {
+  const isTabActive = (label: (typeof baseTabs)[number]['label']) => {
     return activeIdx === tabs.findIndex((tab) => tab.label === label)
   }
 
@@ -197,60 +260,4 @@ graphql`
   }
 `
 
-export default createFragmentContainer(ScopePhaseArea, {
-  meeting: graphql`
-    fragment ScopePhaseArea_meeting on PokerMeeting {
-      ...StageTimerDisplay_meeting
-      ...StageTimerControl_meeting
-      ...ScopePhaseAreaGitHub_meeting
-      ...ScopePhaseAreaGitLab_meeting
-      ...ScopePhaseAreaJira_meeting
-      ...ScopePhaseAreaJiraServer_meeting
-      ...ScopePhaseAreaParabolScoping_meeting
-      ...ScopePhaseAreaAzureDevOps_meeting
-      endedAt
-      localPhase {
-        ...ScopePhaseArea_phase @relay(mask: false)
-      }
-      localStage {
-        isComplete
-      }
-      phases {
-        ...ScopePhaseArea_phase @relay(mask: false)
-      }
-      showSidebar
-      viewerMeetingMember {
-        teamMember {
-          integrations {
-            gitlab {
-              cloudProvider {
-                clientId
-              }
-              sharedProviders {
-                clientId
-              }
-            }
-            jiraServer {
-              sharedProviders {
-                id
-              }
-            }
-            azureDevOps {
-              cloudProvider {
-                id
-              }
-              sharedProviders {
-                id
-              }
-            }
-          }
-        }
-        user {
-          featureFlags {
-            azureDevOps
-          }
-        }
-      }
-    }
-  `
-})
+export default ScopePhaseArea

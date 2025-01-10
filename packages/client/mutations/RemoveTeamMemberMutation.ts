@@ -1,5 +1,8 @@
 import graphql from 'babel-plugin-relay/macro'
 import {commitMutation} from 'react-relay'
+import {RemoveTeamMemberMutation as TRemoveTeamMemberMutation} from '../__generated__/RemoveTeamMemberMutation.graphql'
+import {RemoveTeamMemberMutation_task$data} from '../__generated__/RemoveTeamMemberMutation_task.graphql'
+import {RemoveTeamMemberMutation_team$data} from '../__generated__/RemoveTeamMemberMutation_team.graphql'
 import {
   OnNextHandler,
   OnNextHistoryContext,
@@ -8,15 +11,12 @@ import {
 } from '../types/relayMutations'
 import onMeetingRoute from '../utils/onMeetingRoute'
 import onTeamRoute from '../utils/onTeamRoute'
-import {RemoveTeamMemberMutation as TRemoveTeamMemberMutation} from '../__generated__/RemoveTeamMemberMutation.graphql'
-import {RemoveTeamMemberMutation_task} from '../__generated__/RemoveTeamMemberMutation_task.graphql'
-import {RemoveTeamMemberMutation_team} from '../__generated__/RemoveTeamMemberMutation_team.graphql'
+import SetNotificationStatusMutation from './SetNotificationStatusMutation'
 import handleAddNotifications from './handlers/handleAddNotifications'
 import handleRemoveTasks from './handlers/handleRemoveTasks'
 import handleRemoveTeamMembers from './handlers/handleRemoveTeamMembers'
 import handleRemoveTeams from './handlers/handleRemoveTeams'
 import handleUpsertTasks from './handlers/handleUpsertTasks'
-import SetNotificationStatusMutation from './SetNotificationStatusMutation'
 
 graphql`
   fragment RemoveTeamMemberMutation_task on RemoveTeamMemberPayload {
@@ -36,6 +36,7 @@ graphql`
 graphql`
   fragment RemoveTeamMemberMutation_teamTeam on Team {
     id
+    isViewerOnTeam
     activeMeetings {
       facilitatorStageId
       facilitatorUserId
@@ -92,7 +93,7 @@ const mutation = graphql`
 `
 
 export const removeTeamMemberTeamOnNext: OnNextHandler<
-  RemoveTeamMemberMutation_team,
+  RemoveTeamMemberMutation_team$data,
   OnNextHistoryContext
 > = (payload, {atmosphere, history}) => {
   if (!payload) return
@@ -128,7 +129,7 @@ export const removeTeamMemberTeamOnNext: OnNextHandler<
   }
 }
 
-export const removeTeamMemberTasksUpdater: SharedUpdater<RemoveTeamMemberMutation_task> = (
+export const removeTeamMemberTasksUpdater: SharedUpdater<RemoveTeamMemberMutation_task$data> = (
   payload,
   {store}
 ) => {
@@ -137,7 +138,7 @@ export const removeTeamMemberTasksUpdater: SharedUpdater<RemoveTeamMemberMutatio
   handleUpsertTasks(tasks as any, store)
 }
 
-export const removeTeamMemberTeamUpdater: SharedUpdater<RemoveTeamMemberMutation_team> = (
+export const removeTeamMemberTeamUpdater: SharedUpdater<RemoveTeamMemberMutation_team$data> = (
   payload,
   {atmosphere, store}
 ) => {

@@ -1,15 +1,17 @@
-import {GraphQLID, GraphQLNonNull} from 'graphql'
+import {GraphQLID, GraphQLNonNull, GraphQLObjectType} from 'graphql'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
-import getRethink from '../../database/rethinkDriver'
+import getKysely from '../../postgres/getKysely'
 import {getUserId} from '../../utils/authorization'
 import publish from '../../utils/publish'
 import standardError from '../../utils/standardError'
 import {GQLContext} from '../graphql'
 import NotificationStatusEnum, {NotificationStatusEnumType} from '../types/NotificationStatusEnum'
-import SetNotificationStatusPayload from '../types/SetNotificationStatusPayload'
 
 export default {
-  type: SetNotificationStatusPayload,
+  type: new GraphQLObjectType({
+    name: 'SetNotificationStatusPayload',
+    fields: {}
+  }),
   description: 'set the interaction status of a notifcation',
   args: {
     notificationId: {
@@ -25,7 +27,7 @@ export default {
     {notificationId, status}: {notificationId: string; status: NotificationStatusEnumType},
     {authToken, dataLoader, socketId: mutatorId}: GQLContext
   ) {
-    const r = await getRethink()
+    const pg = getKysely()
     const operationId = dataLoader.share()
     const subOptions = {mutatorId, operationId}
 
@@ -38,7 +40,7 @@ export default {
     }
 
     // RESOLUTION
-    await r.table('Notification').get(notificationId).update({status}).run()
+    await pg.updateTable('Notification').set({status}).where('id', '=', notificationId).execute()
     // mutate dataloader cache
     notification.status = status
 

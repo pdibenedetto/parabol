@@ -1,9 +1,9 @@
 import {RecordSourceSelectorProxy} from 'relay-runtime'
-import getDiscussionThreadConn from '~/mutations/connections/getDiscussionThreadConn'
 import {handleRemoveReply} from '~/mutations/DeleteCommentMutation'
-import {parseUserTaskFilterQueryParams} from '~/utils/useUserTaskFilters'
-import ITask from '../../../server/database/types/Task'
+import getDiscussionThreadConn from '~/mutations/connections/getDiscussionThreadConn'
+import {parseQueryParams} from '~/utils/useQueryParameterParser'
 import IUser from '../../../server/database/types/User'
+import {Task as ITask} from '../../../server/postgres/types/index.d'
 import safeRemoveNodeFromArray from '../../utils/relay/safeRemoveNodeFromArray'
 import safeRemoveNodeFromConn from '../../utils/relay/safeRemoveNodeFromConn'
 import getArchivedTasksConn from '../connections/getArchivedTasksConn'
@@ -26,7 +26,7 @@ const handleRemoveTask = (taskId: string, store: RecordSourceSelectorProxy<any>)
   const meetingId = task.getValue('meetingId')
   const meeting = store.get(meetingId!)!
   const team = store.get(teamId)
-  const {userIds, teamIds} = parseUserTaskFilterQueryParams(viewer.getDataID(), window.location)
+  const {userIds, teamIds} = parseQueryParams(viewer.getDataID(), window.location)
   const archiveConns = [
     /* archived task conn in user dash*/ getArchivedTasksConn(viewer, userIds, teamIds),
     /* archived task conn in team dash*/ getArchivedTasksConn(viewer, null, [teamId])

@@ -5,7 +5,7 @@
  *  - GitHub and GitLab schemas
  */
 import {addResolversToSchema, mergeSchemas} from '@graphql-tools/schema'
-import {GraphQLSchema} from 'graphql'
+import {GraphQLObjectType, GraphQLSchema} from 'graphql'
 import nestGitHubEndpoint from 'nest-graphql-endpoint/lib/nestGitHubEndpoint'
 import {IntegrationProviderGitLabOAuth2} from '../../postgres/queries/getIntegrationProvidersByIds'
 import githubSchema from '../../utils/githubSchema.graphql'
@@ -16,22 +16,32 @@ import nestGitLabEndpoint from '../nestedSchema/nestGitLabEndpoint'
 import resolveTypesForMutationPayloads from '../resolveTypesForMutationPayloads'
 import mutation from '../rootMutation'
 import query from '../rootQuery'
-import subscription from '../rootSubscription'
 import rootTypes from '../rootTypes'
 import permissions from './permissions'
 // Resolvers from SDL first definitions
 import resolvers from './resolvers'
 
-// Schema from legacy  TypeScript first definitions
-const legacyParabolSchema = new GraphQLSchema({
+// Schema from legacy TypeScript first definitions instead of SDL pattern
+const legacyTypeDefs = new GraphQLSchema({
   query,
   mutation,
-  subscription,
+  // defining a placeholder subscription because there's a bug in nest-graphql-schema that prefixes to _xGitHubSubscription if missing
+  subscription: new GraphQLObjectType({name: 'Subscription', fields: {}}),
   types: rootTypes
 })
 
-const {schema: legacyParabolWithGitHubSchema, githubRequest} = nestGitHubEndpoint({
-  parentSchema: legacyParabolSchema,
+const importAllStrings = (context: __WebpackModuleApi.RequireContext) => {
+  return context.keys().map((id) => context(id).default)
+}
+
+// Merge old POJO definitions with SDL definitions
+const parabolTypeDefs = mergeSchemas({
+  schemas: [legacyTypeDefs],
+  typeDefs: importAllStrings(require.context('./typeDefs', false, /.graphql$/))
+})
+
+const {schema: typeDefsWithGitHub, githubRequest} = nestGitHubEndpoint({
+  parentSchema: parabolTypeDefs,
   parentType: 'GitHubIntegration',
   fieldName: 'api',
   resolveEndpointContext: ({accessToken}) => ({
@@ -42,8 +52,8 @@ const {schema: legacyParabolWithGitHubSchema, githubRequest} = nestGitHubEndpoin
   schemaIDL: githubSchema
 })
 
-const {schema: legacyParabolWithGitLabSchema, gitlabRequest} = nestGitLabEndpoint({
-  parentSchema: legacyParabolSchema,
+const {schema: typeDefsWithGitHubGitLab, gitlabRequest} = nestGitLabEndpoint({
+  parentSchema: typeDefsWithGitHub,
   parentType: 'GitLabIntegration',
   fieldName: 'api',
   resolveEndpointContext: async (
@@ -67,24 +77,15 @@ const {schema: legacyParabolWithGitLabSchema, gitlabRequest} = nestGitLabEndpoin
   schemaIDL: gitlabSchema
 })
 
-const importAllStrings = (context: __WebpackModuleApi.RequireContext) => {
-  return context.keys().map((id) => context(id).default)
-}
-
-// Types from SDL first
-const typeDefs = importAllStrings(require.context('./typeDefs', false, /.graphql$/))
-
-const legacyParabolWithNestedSchema = mergeSchemas({
-  schemas: [legacyParabolWithGitHubSchema, legacyParabolWithGitLabSchema],
-  typeDefs
-})
-
 // IMPORTANT! mergeSchemas has a bug where resolvers will be overwritten by the default resolvers
 // See https://github.com/ardatan/graphql-tools/issues/4367
-const parabolWithNestedResolversSchema = addResolversToSchema({
-  schema: legacyParabolWithNestedSchema,
-  resolvers: composeResolvers(resolvers, permissions)
-})
+const publicSchema = resolveTypesForMutationPayloads(
+  addResolversToSchema({
+    schema: typeDefsWithGitHubGitLab,
+    resolvers: composeResolvers(resolvers, permissions),
+    inheritResolversFromInterfaces: true
+  })
+)
 
 const addRequestors = (schema: GraphQLSchema) => {
   const finalSchema = schema as any
@@ -96,7 +97,6 @@ const addRequestors = (schema: GraphQLSchema) => {
   }
 }
 
-const rootSchema = addRequestors(resolveTypesForMutationPayloads(parabolWithNestedResolversSchema))
+const rootSchema = addRequestors(publicSchema)
 
-export type RootSchema = typeof rootSchema
 export default rootSchema

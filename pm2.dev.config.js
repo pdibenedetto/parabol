@@ -5,19 +5,6 @@ module.exports = {
       script: 'scripts/buildServers.js'
     },
     {
-      name: 'GraphQL Executor',
-      script: 'scripts/runExecutor.js',
-      // increase this to test scaling
-      instances: 1,
-      increment_var: 'SERVER_ID',
-      env: {
-        SERVER_ID: 3
-      },
-      watch: ['dev/gqlExecutor.js'],
-      // if the watched file doeesn't exist, wait for it instead of restarting
-      autorestart: false
-    },
-    {
       name: 'Socket Server',
       script: 'scripts/runSocketServer.js',
       // increase this to test scaling
@@ -31,26 +18,52 @@ module.exports = {
       autorestart: false
     },
     {
+      name: 'GraphQL Executor',
+      script: 'scripts/runExecutor.js',
+      // increase this to test scaling
+      instances: 1,
+      increment_var: 'SERVER_ID',
+      env: {
+        SERVER_ID: 3
+      },
+      watch: ['dev/gqlExecutor.js'],
+      // if the watched file doeesn't exist, wait for it instead of restarting
+      autorestart: false
+    },
+    {
+      name: 'Embedder',
+      script: 'scripts/runEmbedder.js',
+      // increase this to test scaling
+      instances: 1,
+      increment_var: 'SERVER_ID',
+      env: {
+        SERVER_ID: 6
+      },
+      watch: ['dev/embedder.js'],
+      // if the watched file doeesn't exist, wait for it instead of restarting
+      autorestart: false
+    },
+    {
       name: 'Dev Server',
       script: 'scripts/hmrServer.js'
     },
     {
-      name: 'DB Migrations',
-      script: 'scripts/runMigrations.js',
-      // once this completes, it will exit
+      name: 'Flush Redis',
+      script: 'scripts/flushRedis.js',
       autorestart: false
     },
     {
-      name: 'GraphQL Schema Updater',
-      script: 'scripts/runSchemaUpdater.js',
-      watch: ['packages/server/graphql/public/typeDefs', 'packages/server/graphql/private/typeDefs']
+      name: 'PG Migrations',
+      script: 'yarn kysely migrate:latest',
+      autorestart: false
     },
     {
       name: 'Relay Compiler',
-      script: 'scripts/compileRelay.js',
-      args: '--watch',
+      script: 'scripts/relayWatch.js',
       watch: [
         'packages/server/graphql/public/schema.graphql',
+        'packages/server/graphql/public/typeDefs',
+        'packages/server/graphql/private/typeDefs',
         'packages/client/clientSchema.graphql'
       ]
     },
@@ -64,8 +77,29 @@ module.exports = {
       instances: 1
     },
     {
+      name: 'Kysely Codegen',
+      script: 'yarn pg:generate',
+      autorestart: false
+    },
+    {
       name: 'PG Typed',
-      script: 'yarn pg:build -w'
+      script: 'yarn pg:build',
+      watch: ['packages/server/postgres/queries/src/*.sql'],
+      autorestart: false
+    },
+    {
+      name: 'Mattermost Relay Compiler',
+      script: 'yarn workspace parabol-mattermost-plugin relay-compiler',
+      watch: [
+        'packages/mattermost-plugin/**/*.ts*'
+      ],
+      autorestart: false,
+      instances: 1
+    },
+    {
+      name: 'Mattermost Plugin Dev Server',
+      script: 'yarn workspace parabol-mattermost-plugin dev',
+      instances: 1
     }
   ].map((app) => ({
     env_production: {

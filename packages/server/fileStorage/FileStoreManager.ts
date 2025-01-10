@@ -1,27 +1,47 @@
 import generateUID from '../generateUID'
 
-export interface PutFileOptions {
-  partialPath: string
-  buffer: Buffer
-}
+export type FileAssetDir = 'store' | 'build'
 
 export default abstract class FileStoreManager {
-  static getUserAvatarPath(userId: string, ext: string): string {
-    return `User/${userId}/picture/${generateUID()}.${ext}`
+  abstract baseUrl: string
+  abstract checkExists(fileName: string, assetDir?: FileAssetDir): Promise<boolean>
+  abstract prependPath(partialPath: string, assetDir?: FileAssetDir): string
+  abstract getPublicFileLocation(fullPath: string): string
+
+  protected abstract putFile(file: ArrayBufferLike, fullPath: string): Promise<string>
+  protected abstract putUserFile(file: ArrayBufferLike, partialPath: string): Promise<string>
+  abstract putBuildFile(file: ArrayBufferLike, partialPath: string): Promise<string>
+
+  abstract presignUrl(url: string): Promise<string>
+  async putUserAvatar(file: ArrayBufferLike, userId: string, ext: string, name?: string) {
+    const filename = name ?? generateUID()
+    // replace the first dot, if there is one, but not any other dots
+    const dotfreeExt = ext.replace(/^\./, '')
+    const partialPath = `User/${userId}/picture/${filename}.${dotfreeExt}`
+    return this.putUserFile(file, partialPath)
   }
 
-  static getOrgAvatarPath(orgId: string, ext: string): string {
-    return `Organization/${orgId}/picture/${generateUID()}.${ext}`
+  async putOrgAvatar(file: ArrayBufferLike, orgId: string, ext: string, name?: string) {
+    const filename = name ?? generateUID()
+    const dotfreeExt = ext.replace(/^\./, '')
+    const partialPath = `Organization/${orgId}/picture/${filename}.${dotfreeExt}`
+    return this.putUserFile(file, partialPath)
   }
 
-  protected abstract prependPath(partialPath: string): string
-  protected abstract _putFile(fullPath: string, buffer: Buffer): Promise<void>
-  protected abstract getPublicFileLocation(fullPath: string): string
+  async putOrgIdPMetadata(file: ArrayBufferLike, orgId: string) {
+    const partialPath = `Organization/${orgId}/idpMetadata.xml`
+    return this.putUserFile(file, partialPath)
+  }
 
-  async putFile(options: PutFileOptions): Promise<string> {
-    const {partialPath, buffer} = options
-    const fullPath = this.prependPath(partialPath)
-    await this._putFile(fullPath, buffer)
-    return this.getPublicFileLocation(fullPath)
+  async putTemplateIllustration(file: ArrayBufferLike, orgId: string, ext: string, name?: string) {
+    const filename = name ?? generateUID()
+    const dotfreeExt = ext.replace(/^\./, '')
+    const partialPath = `Organization/${orgId}/template/${filename}.${dotfreeExt}`
+    return this.putUserFile(file, partialPath)
+  }
+
+  async putDebugFile(file: ArrayBufferLike, nameWithExt: string) {
+    const partialPath = `__debug__/${nameWithExt}`
+    return this.putUserFile(file, partialPath)
   }
 }
