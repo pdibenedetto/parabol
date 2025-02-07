@@ -2,7 +2,7 @@ import graphql from 'babel-plugin-relay/macro'
 import {commitLocalUpdate, commitMutation} from 'react-relay'
 import {RecordProxy, RecordSourceSelectorProxy} from 'relay-runtime'
 import {EndDraggingReflectionMutation as TEndDraggingReflectionMutation} from '~/__generated__/EndDraggingReflectionMutation.graphql'
-import {EndDraggingReflectionMutation_meeting} from '~/__generated__/EndDraggingReflectionMutation_meeting.graphql'
+import {EndDraggingReflectionMutation_meeting$data} from '~/__generated__/EndDraggingReflectionMutation_meeting.graphql'
 import {OnNextHandler, SharedUpdater, SimpleMutation} from '../types/relayMutations'
 import dndNoise from '../utils/dndNoise'
 import addNodeToArray from '../utils/relay/addNodeToArray'
@@ -108,7 +108,7 @@ export const moveReflectionLocation = (
 }
 
 export const endDraggingReflectionMeetingUpdater: SharedUpdater<
-  EndDraggingReflectionMutation_meeting
+  EndDraggingReflectionMutation_meeting$data
 > = (payload, {store}) => {
   const reflection = payload.getLinkedRecord('reflection')
   if (!reflection) return
@@ -127,7 +127,7 @@ export const endDraggingReflectionMeetingUpdater: SharedUpdater<
 }
 
 export const endDraggingReflectionMeetingOnNext: OnNextHandler<
-  EndDraggingReflectionMutation_meeting
+  EndDraggingReflectionMutation_meeting$data
 > = (payload, context) => {
   const {atmosphere} = context
   const {reflection} = payload
@@ -170,6 +170,7 @@ const EndDraggingReflectionMutation: SimpleMutation<TEndDraggingReflectionMutati
       const oldReflectionGroupId = reflection.getValue('reflectionGroupId') as string
       let reflectionGroupProxy: RecordProxy<{meetingId: string}>
       const newReflectionGroupId = clientTempId()
+
       // move a reflection into its own group
       if (!reflectionGroupId) {
         // create the new group
@@ -180,7 +181,8 @@ const EndDraggingReflectionMutation: SimpleMutation<TEndDraggingReflectionMutati
           isActive: true,
           sortOrder: 0,
           updatedAt: nowISO,
-          voterIds: []
+          title: '',
+          smartTitle: ''
         }
         reflectionGroupProxy = createProxyRecord(store, 'RetroReflectionGroup', reflectionGroup)
         updateProxyRecord(reflection, {sortOrder: 0, reflectionGroupId: newReflectionGroupId})
@@ -198,6 +200,8 @@ const EndDraggingReflectionMutation: SimpleMutation<TEndDraggingReflectionMutati
           reflectionGroupId
         })
         reflection.setLinkedRecord(reflectionGroupProxy, 'retroReflectionGroup')
+        reflectionGroupProxy.setValue('', 'title')
+        reflectionGroupProxy.setValue('', 'smartTitle')
       }
       moveReflectionLocation(reflection, reflectionGroupProxy, oldReflectionGroupId, store)
     }

@@ -1,10 +1,11 @@
 import generateUID from '../../generateUID'
+import {TierEnum} from '../../graphql/public/resolverTypes'
 import {TEAM_NAME_LIMIT} from '../../postgres/constants'
 import {MeetingTypeEnum} from '../../postgres/types/Meeting'
-import {TierEnum} from './Invoice'
 
 interface Input {
   id?: string
+  autoJoin?: boolean
   name: string
   createdAt?: Date
   createdBy: string
@@ -12,6 +13,7 @@ interface Input {
   isArchived?: boolean
   isPaid?: boolean
   tier: TierEnum
+  trialStartDate?: Date | null
   orgId: string
   qualAIMeetingsCount?: number
   isOnboardTeam?: boolean
@@ -20,6 +22,7 @@ interface Input {
 
 export default class Team {
   id: string
+  autoJoin: boolean
   name: string
   createdAt: Date
   createdBy: string
@@ -28,12 +31,14 @@ export default class Team {
   lastMeetingType: MeetingTypeEnum
   lockMessageHTML?: string | null
   tier: TierEnum
+  trialStartDate?: Date | null
   orgId: string
   isOnboardTeam: boolean
   qualAIMeetingsCount: number
   updatedAt: Date
   constructor(input: Input) {
     const {
+      autoJoin,
       createdAt,
       createdBy,
       id,
@@ -44,13 +49,16 @@ export default class Team {
       name,
       orgId,
       tier,
+      trialStartDate,
       qualAIMeetingsCount,
       updatedAt
     } = input
+    this.autoJoin = autoJoin ?? false
     this.name = name.trim().slice(0, TEAM_NAME_LIMIT)
     this.createdBy = createdBy
     this.orgId = orgId
     this.tier = tier
+    this.trialStartDate = trialStartDate
     this.id = id ?? generateUID()
     this.createdAt = createdAt ?? new Date()
     this.updatedAt = updatedAt ?? new Date()

@@ -1,23 +1,18 @@
 import DataLoader from 'dataloader'
-import TeamMemberIntegrationAuthId from '../../client/shared/gqlIds/TeamMemberIntegrationAuthId'
-import getRethink from '../database/rethinkDriver'
-import SlackAuth from '../database/types/SlackAuth'
-import SlackNotification, {SlackNotificationEvent} from '../database/types/SlackNotification'
 import errorFilter from '../graphql/errorFilter'
 import isValid from '../graphql/isValid'
-import {IGetBestTeamIntegrationAuthQueryResult} from '../postgres/queries/generated/getBestTeamIntegrationAuthQuery'
+import getKysely from '../postgres/getKysely'
 import {IntegrationProviderServiceEnum} from '../postgres/queries/generated/getIntegrationProvidersByIdsQuery'
-import {IGetTeamMemberIntegrationAuthQueryResult} from '../postgres/queries/generated/getTeamMemberIntegrationAuthQuery'
-import getBestTeamIntegrationAuth from '../postgres/queries/getBestTeamIntegrationAuth'
 import getIntegrationProvidersByIds, {
   TIntegrationProvider
 } from '../postgres/queries/getIntegrationProvidersByIds'
-import getSharedIntegrationProviders from '../postgres/queries/getSharedIntegrationProviders'
-import getTeamMemberIntegrationAuth from '../postgres/queries/getTeamMemberIntegrationAuth'
+import {selectSlackNotifications, selectTeamMemberIntegrationAuth} from '../postgres/select'
+import {SlackAuth, SlackNotification, TeamMemberIntegrationAuth} from '../postgres/types'
+import {NotificationSettings} from '../postgres/types/pg'
 import NullableDataLoader from './NullableDataLoader'
 import RootDataLoader from './RootDataLoader'
 
-interface TeamMemberIntegrationAuthPrimaryKey {
+interface TeamMemberIntegrationAuthServiceTeamUserKey {
   service: IntegrationProviderServiceEnum
   teamId: string
   userId: string
@@ -25,8 +20,9 @@ interface TeamMemberIntegrationAuthPrimaryKey {
 
 interface SharedIntegrationProviderKey {
   service: IntegrationProviderServiceEnum
-  /// All team ids belonging to the organization, used for scope === 'org'
-  orgTeamIds: string[]
+  /// Query with 'org' scope by orgId
+  orgIds: string[]
+  /// Query with 'team' scope by teamId
   teamIds: string[]
 }
 
@@ -34,7 +30,7 @@ const teamMemberIntegrationAuthCacheKeyFn = ({
   service,
   teamId,
   userId
-}: TeamMemberIntegrationAuthPrimaryKey) => TeamMemberIntegrationAuthId.join(service, teamId, userId)
+}: TeamMemberIntegrationAuthServiceTeamUserKey) => `${service}-${teamId}-${userId}`
 
 export const integrationProviders = (parent: RootDataLoader) => {
   return new NullableDataLoader<number, TIntegrationProvider, string>(
@@ -53,88 +49,66 @@ export const integrationProviders = (parent: RootDataLoader) => {
 export const sharedIntegrationProviders = (parent: RootDataLoader) => {
   return new DataLoader<SharedIntegrationProviderKey, TIntegrationProvider[], string>(
     async (keys) => {
-      const results = await Promise.allSettled(
-        keys.map(async ({service, orgTeamIds, teamIds}) =>
-          getSharedIntegrationProviders(service, orgTeamIds, teamIds)
-        )
-      )
-      const vals = results.map((result) => (result.status === 'fulfilled' ? result.value : []))
-      return vals
-    },
-    {
-      ...parent.dataLoaderOptions
-    }
-  )
-}
+      // slightly overfetching with the services here to keep the query simple
+      const services = Array.from(new Set(keys.map(({service}) => service)))
+      const orgIds = Array.from(new Set(keys.flatMap(({orgIds}) => orgIds)))
+      const teamIds = Array.from(new Set(keys.flatMap(({teamIds}) => teamIds)))
 
-export const bestTeamIntegrationProviders = (parent: RootDataLoader) => {
-  return new DataLoader<TeamMemberIntegrationAuthPrimaryKey, TIntegrationProvider | null, string>(
-    async (keys) => {
-      // given token params, get the best team token
-      const bestTeamIntegrationAuths = (
-        await parent.get('bestTeamIntegrationAuths').loadMany(keys)
-      ).filter(isValid)
-      // dedupe providerIds
-      const providerIds = Array.from(
-        new Set(bestTeamIntegrationAuths.map((token) => token.providerId))
-      )
-      // get the providers for each token
-      const integrationProviders = (
-        await parent.get('integrationProviders').loadMany(providerIds)
-      ).filter(isValid)
-      return keys.map((key) => {
-        const token = bestTeamIntegrationAuths.find(
-          ({service, teamId}) => service === key.service && teamId === key.teamId
+      const pg = getKysely()
+      const results = await pg
+        .selectFrom('IntegrationProvider')
+        .selectAll()
+        .where(({and, or, eb}) =>
+          and([
+            eb('service', 'in', services),
+            eb('isActive', '=', true),
+            or([eb('scope', '!=', 'team'), eb('teamId', 'in', [...teamIds, ''])]),
+            or([eb('scope', '!=', 'org'), eb('orgId', 'in', [...orgIds, ''])])
+          ])
         )
-        if (!token) return null
-        const provider = integrationProviders.find(({id}) => id === token.providerId)
-        return provider ?? null
-      })
+        .execute()
+      return keys.map(({service, orgIds, teamIds}) =>
+        results.filter(
+          (row) =>
+            row.service === service &&
+            (row.scope === 'global' ||
+              (row.scope === 'org' && row.orgId && orgIds.includes(row.orgId)) ||
+              (row.scope === 'team' && row.teamId && teamIds.includes(row.teamId)))
+        )
+      ) as TIntegrationProvider[][]
     },
     {
       ...parent.dataLoaderOptions,
-      cacheKeyFn: teamMemberIntegrationAuthCacheKeyFn
+      cacheKeyFn: ({service, orgIds, teamIds}) =>
+        `${service}-${orgIds.toSorted().join(',')}-${teamIds.toSorted().join(',')}`
     }
   )
 }
 
-export const teamMemberIntegrationAuths = (parent: RootDataLoader) => {
+export const teamMemberIntegrationAuthsByServiceTeamAndUserId = (parent: RootDataLoader) => {
   return new DataLoader<
-    TeamMemberIntegrationAuthPrimaryKey,
-    IGetTeamMemberIntegrationAuthQueryResult | null,
+    TeamMemberIntegrationAuthServiceTeamUserKey,
+    TeamMemberIntegrationAuth | null,
     string
   >(
     async (keys) => {
-      const results = await Promise.allSettled(
-        keys.map(async ({service, teamId, userId}) =>
-          getTeamMemberIntegrationAuth(service, teamId, userId)
+      const results = await selectTeamMemberIntegrationAuth()
+        .where(({eb, refTuple, tuple}) =>
+          eb(
+            refTuple('teamId', 'userId', 'service'),
+            'in',
+            keys.map((key) => tuple(key.teamId, key.userId, key.service))
+          )
         )
+        .where('isActive', '=', true)
+        .execute()
+      return keys.map(
+        (key) =>
+          results.find(
+            ({teamId, userId, service}) =>
+              key.teamId === teamId && key.userId === userId && key.service === service
+          ) || null
       )
-      const vals = results.map((result) => (result.status === 'fulfilled' ? result.value : null))
-      return vals
-    },
-    {
-      ...parent.dataLoaderOptions,
-      cacheKeyFn: teamMemberIntegrationAuthCacheKeyFn
-    }
-  )
-}
-
-export const bestTeamIntegrationAuths = (parent: RootDataLoader) => {
-  return new DataLoader<
-    TeamMemberIntegrationAuthPrimaryKey,
-    IGetBestTeamIntegrationAuthQueryResult | null,
-    string
-  >(
-    async (keys) => {
-      // TODO check the teamMemberIntegrationAuths loader first, it probably exists there & then we don't have to hit the DB
-      const results = await Promise.allSettled(
-        keys.map(async ({service, teamId, userId}) =>
-          getBestTeamIntegrationAuth(service, teamId, userId)
-        )
-      )
-      const vals = results.map((result) => (result.status === 'fulfilled' ? result.value : null))
-      return vals
     },
     {
       ...parent.dataLoaderOptions,
@@ -145,52 +119,97 @@ export const bestTeamIntegrationAuths = (parent: RootDataLoader) => {
 
 interface TeamNotificationEvent {
   teamId: string
-  event: SlackNotificationEvent
+  event: SlackNotification['event']
 }
 
 export type SlackNotificationAuth = SlackNotification & {auth: SlackAuth}
 
 export const slackNotificationsByTeamIdAndEvent = (parent: RootDataLoader) => {
   return new DataLoader<TeamNotificationEvent, SlackNotificationAuth[], string>(async (keys) => {
-    const r = await getRethink()
-    const notifications = await r
-      .expr(keys)
-      .concatMap((key) =>
-        r
-          .table('SlackNotification')
-          .getAll(key('teamId'), {index: 'teamId'})
-          .filter({event: key('event')})
+    const res = await selectSlackNotifications()
+      .where(({eb, refTuple, tuple}) =>
+        eb(
+          refTuple('teamId', 'event'),
+          'in',
+          keys.map((key) => tuple(key.teamId, key.event))
+        )
       )
-      .coerceTo('array')
-      .run()
-
-    const distinctChannelNotifications = keys.map((key) => {
-      const usedChannelIds = new Set()
-      return notifications.filter((notification) => {
-        const {teamId, event, channelId} = notification
-        if (teamId !== key.teamId || event !== key.event) return false
-        if (!channelId || usedChannelIds.has(channelId)) return false
-        usedChannelIds.add(channelId)
-        return true
-      })
-    })
-    const notificationUserIds = distinctChannelNotifications.flatMap((not) =>
-      not.map(({userId}) => userId)
-    )
-    const userSlackAuths = (await parent.get('slackAuthByUserId').loadMany(notificationUserIds))
+      .execute()
+    const userIds = [...new Set(res.map(({userId}) => userId))]
+    const userSlackAuths = (await parent.get('slackAuthByUserId').loadMany(userIds))
       .filter(errorFilter)
       .flat()
 
-    return distinctChannelNotifications.map(
-      (notifications) =>
-        notifications
-          .map((notification) => ({
+    return keys.map((key) => {
+      const usedChannelIds = new Set<string>()
+      return res
+        .filter((doc) => doc.teamId === key.teamId && doc.event === key.event)
+        .map((notification) => {
+          const auth = userSlackAuths.find(
+            (auth) => auth.userId === notification.userId && auth.teamId === notification.teamId
+          )
+          if (!auth) return null
+          return {
             ...notification,
-            auth: userSlackAuths.find(
-              ({userId, teamId}) => userId === notification.userId && teamId === notification.teamId
-            )
-          }))
-          .filter(({auth}) => !!auth) as SlackNotificationAuth[]
-    )
+            auth
+          }
+        })
+        .filter(isValid)
+        .filter(({channelId}) => {
+          if (!channelId || usedChannelIds.has(channelId)) return false
+          usedChannelIds.add(channelId)
+          return true
+        })
+    })
   })
+}
+
+export const teamMemberIntegrationAuthsByTeamIdAndEvent = (parent: RootDataLoader) => {
+  return new DataLoader<
+    {teamId: string; service: IntegrationProviderServiceEnum; event: SlackNotification['event']},
+    TeamMemberIntegrationAuth[],
+    string
+  >(
+    async (keys) => {
+      const pg = getKysely()
+      const res = (await pg
+        .selectFrom('TeamMemberIntegrationAuth')
+        .innerJoin('NotificationSettings', 'authId', 'TeamMemberIntegrationAuth.id')
+        .selectAll()
+        .where(({eb, refTuple, tuple}) =>
+          eb(
+            refTuple('teamId', 'service', 'event'),
+            'in',
+            keys.map(({teamId, service, event}) => tuple(teamId, service, event))
+          )
+        )
+        .execute()) as unknown as TeamMemberIntegrationAuth[]
+
+      return keys.map((key) =>
+        res.filter(({teamId, service}) => teamId === key.teamId && service === key.service)
+      )
+    },
+    {
+      ...parent.dataLoaderOptions,
+      cacheKeyFn: ({teamId, service}) => `${teamId}-${service}`
+    }
+  )
+}
+
+export const notificationSettingsByAuthId = (parent: RootDataLoader) => {
+  return new DataLoader<number, NotificationSettings['event'][], string>(
+    async (keys) => {
+      const pg = getKysely()
+      const res = await pg
+        .selectFrom('NotificationSettings')
+        .selectAll()
+        .where(({eb}) => eb('authId', 'in', keys))
+        .execute()
+
+      return keys.map((key) => res.filter(({authId}) => authId === key).map(({event}) => event))
+    },
+    {
+      ...parent.dataLoaderOptions
+    }
+  )
 }

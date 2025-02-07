@@ -2,16 +2,12 @@ import graphql from 'babel-plugin-relay/macro'
 import {commitMutation} from 'react-relay'
 import {Disposable} from 'relay-runtime'
 import Atmosphere from '../Atmosphere'
+import {UpdateOrgMutation as TUpdateOrgMutation} from '../__generated__/UpdateOrgMutation.graphql'
 import {LocalHandlers} from '../types/relayMutations'
-import {
-  UpdateOrgMutation as TUpdateOrgMutation,
-  UpdateOrgMutationVariables
-} from '../__generated__/UpdateOrgMutation.graphql'
 graphql`
   fragment UpdateOrgMutation_organization on UpdateOrgPayload {
     organization {
       name
-      picture
     }
   }
 `
@@ -29,7 +25,7 @@ const mutation = graphql`
 
 const UpdateOrgMutation = (
   atmosphere: Atmosphere,
-  variables: UpdateOrgMutationVariables,
+  variables: TUpdateOrgMutation['variables'],
   {onCompleted, onError}: LocalHandlers
 ): Disposable => {
   return commitMutation<TUpdateOrgMutation>(atmosphere, {
@@ -37,12 +33,9 @@ const UpdateOrgMutation = (
     variables,
     optimisticUpdater: (store) => {
       const {updatedOrg} = variables
-      const {id, picture, name} = updatedOrg
+      const {id, name} = updatedOrg
       const organization = store.get(id)
       if (!organization) return
-      if (picture) {
-        organization.setValue(picture, 'picture')
-      }
       if (name) {
         organization.setValue(name, 'name')
       }

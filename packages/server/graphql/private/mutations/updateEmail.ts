@@ -1,38 +1,43 @@
-import getRethink from '../../../database/rethinkDriver'
-import {getUserByEmail} from '../../../postgres/queries/getUsersByEmails'
-import updateUser from '../../../postgres/queries/updateUser'
+import getKysely from '../../../postgres/getKysely'
+import {JsonObject} from '../../../postgres/types/pg'
 import {MutationResolvers} from '../resolverTypes'
 
 const updateEmail: MutationResolvers['updateEmail'] = async (_source, {oldEmail, newEmail}) => {
-  const r = await getRethink()
+  const pg = getKysely()
 
   // VALIDATION
   if (oldEmail === newEmail) {
     throw new Error('New email is the same as the old one')
   }
 
-  const user = await getUserByEmail(oldEmail)
+  const user = await pg
+    .selectFrom('User')
+    .selectAll()
+    .where('email', '=', oldEmail)
+    .executeTakeFirst()
+
   if (!user) {
     throw new Error(`User with ${oldEmail} not found`)
   }
 
-  // RESOLUTION
-  const {id: userId} = user
-  const updates = {
-    email: newEmail,
-    updatedAt: new Date()
+  const {id: userId, identities} = user
+
+  if (identities && identities.length > 0) {
+    const localIdentity = (identities as JsonObject[]).find((identity) => identity.type === 'LOCAL')
+    if (localIdentity) {
+      localIdentity.isEmailVerified = false
+    }
   }
-  await Promise.all([
-    r.table('User').get(userId).update(updates).run(),
-    r
-      .table('TeamMember')
-      .getAll(userId, {index: 'userId'})
-      .update({
-        email: newEmail
-      })
-      .run(),
-    updateUser(updates, userId)
-  ])
+
+  // Update the email along with the identity
+  await pg
+    .with('TeamMemberUpdate', (qc) =>
+      qc.updateTable('TeamMember').set({email: newEmail}).where('userId', '=', userId)
+    )
+    .updateTable('User')
+    .set({email: newEmail, identities: identities})
+    .where('id', '=', userId)
+    .execute()
 
   return true
 }

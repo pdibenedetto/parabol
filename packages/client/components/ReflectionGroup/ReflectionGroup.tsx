@@ -1,8 +1,9 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {RefObject, useEffect, useMemo, useRef, useState} from 'react'
+import {RefObject, useEffect, useMemo, useRef, useState} from 'react'
 import {commitLocalUpdate, useFragment} from 'react-relay'
-import {PortalId} from '~/hooks/usePortal'
+import {ReflectionGroup_meeting$key} from '../../__generated__/ReflectionGroup_meeting.graphql'
+import {ReflectionGroup_reflectionGroup$key} from '../../__generated__/ReflectionGroup_reflectionGroup.graphql'
 import useAtmosphere from '../../hooks/useAtmosphere'
 import useEventCallback from '../../hooks/useEventCallback'
 import useExpandedReflections from '../../hooks/useExpandedReflections'
@@ -13,8 +14,6 @@ import {
   Times
 } from '../../types/constEnums'
 import {GROUP} from '../../utils/constants'
-import {ReflectionGroup_meeting$key} from '../../__generated__/ReflectionGroup_meeting.graphql'
-import {ReflectionGroup_reflectionGroup$key} from '../../__generated__/ReflectionGroup_reflectionGroup.graphql'
 import {SwipeColumn} from '../GroupingKanban'
 import {OpenSpotlight} from '../GroupingKanbanColumn'
 import ReflectionGroupHeader from '../ReflectionGroupHeader'
@@ -44,7 +43,7 @@ const Group = styled('div')<{staticReflectionCount: number; isSpotlightSource: b
 
 const ReflectionWrapper = styled('div')<{
   staticIdx: number
-  isDropping: boolean | null
+  isDropping: boolean | null | undefined
   groupCount: number
   isHiddenSpotlightSource: boolean
 }>(({staticIdx, isDropping, groupCount, isHiddenSpotlightSource}) => {
@@ -73,7 +72,6 @@ interface Props {
   reflectionGroupRef: ReflectionGroup_reflectionGroup$key
   swipeColumn?: SwipeColumn
   dataCy?: string
-  expandedReflectionGroupPortalParentId?: PortalId
   reflectionIdsToHide?: string[] | null
   isSpotlightEntering?: boolean
   showDragHintAnimation?: boolean
@@ -87,7 +85,6 @@ const ReflectionGroup = (props: Props) => {
     reflectionGroupRef,
     swipeColumn,
     dataCy,
-    expandedReflectionGroupPortalParentId,
     reflectionIdsToHide,
     isSpotlightEntering,
     showDragHintAnimation
@@ -173,13 +170,7 @@ const ReflectionGroup = (props: Props) => {
   }, [visibleReflections])
   const stackRef = useRef<HTMLDivElement>(null)
   const {setItemsRef, scrollRef, bgRef, modalHeaderRef, portal, portalStatus, collapse, expand} =
-    useExpandedReflections(
-      groupRef,
-      stackRef,
-      visibleReflections.length,
-      headerRef,
-      expandedReflectionGroupPortalParentId
-    )
+    useExpandedReflections(groupRef, stackRef, visibleReflections.length, headerRef)
   const atmosphere = useAtmosphere()
   const [isEditing, thisSetIsEditing] = useState(false)
   const isDragPhase = phaseType === 'group' && !isComplete
@@ -195,10 +186,15 @@ const ReflectionGroup = (props: Props) => {
   }
 
   const watchForClick = useEventCallback((e: MouseEvent) => {
-    const isClickOnGroup = e.composedPath().find((el) => el === groupRef.current)
+    const target = e.target as Node
+    const isClickOnGroup = groupRef.current?.contains(target)
     if (!isClickOnGroup) {
-      document.removeEventListener('click', watchForClick)
-      setIsEditing(false)
+      const isClickInRoot = document.getElementById('root')?.contains(target)
+      // If the click is in a portal, ignore it, it could be link editing inside tiptap, etc.
+      if (isClickInRoot) {
+        document.removeEventListener('click', watchForClick)
+        setIsEditing(false)
+      }
     }
   })
   const onClick = () => {

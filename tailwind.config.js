@@ -1,24 +1,27 @@
-const defaultTheme = require('tailwindcss/defaultTheme')
-
+// DEPRECATED! Try to use the global.css file instead
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  corePlugins: {
-    preflight: false
-  },
-  presets: [require('./packages/client/tailwind.preset.js')],
-  content: ['./packages/client/**/*.{ts,tsx,js,jsx,html}'],
+  important: 'body',
+  content: ['./packages/client/**/!(*node_modules*)/**/*.{ts,tsx,js,jsx,html}', './template.html'],
   theme: {
-    fontFamily: {
-      sans: ['IBM Plex Sans', ...defaultTheme.fontFamily.sans],
-      mono: ['IBM Plex Mono', ...defaultTheme.fontFamily.mono]
+    data: {
+      highlighted: 'highlighted=true',
+      // for elements where disabled doesn't exist, e.g. divs
+      disabled: 'disabled=true'
     },
     extend: {
-      spacing: {
-        'icon-md-18': '18px',
-        'icon-md-24': '24px',
-        'icon-md-36': '36px',
-        'icon-md-40': '40px',
-        'icon-md-48': '48px'
+      padding: {
+        'row-gutter': '16px'
+      },
+      boxShadow: {
+        card: 'rgba(0,0,0,.2) 0px 2px 1px -1px, rgba(0,0,0,.14) 0px 1px 1px 0px, rgba(0,0,0,.12) 0px 1px 3px 0px',
+        'card-1':
+          '0px 6px 10px rgba(68, 66, 88, 0.14), 0px 1px 18px rgba(68, 66, 88, 0.12), 0px 3px 5px rgba(68, 66, 88, 0.2)',
+        dialog:
+          '0px 11px 15px -7px rgba(0,0,0,.2), 0px 24px 38px 3px rgba(0,0,0,.14), 0px 9px 46px 8px rgba(0,0,0,.12)',
+        'discussion-input': '0px 0px 16px 0px rgba(0,0,0,0.3)',
+        'discussion-thread':
+          'rgba(0,0,0,.2) 0px 3px 1px -2px, rgba(0,0,0,.14) 0px 2px 2px 0px, rgba(0,0,0,.12) 0px 1px 5px 0px'
       },
       borderRadius: {
         card: '4px'
@@ -38,5 +41,10 @@ module.exports = {
       }
     }
   },
-  plugins: []
+  plugins: [
+    require('@tailwindcss/forms')({
+      strategy: 'class' // only generate classes, overiding global form styles would affect non-tailwind other components
+    }),
+    require('@tailwindcss/container-queries')
+  ]
 }

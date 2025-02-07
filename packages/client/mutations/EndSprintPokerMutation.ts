@@ -1,7 +1,9 @@
 import graphql from 'babel-plugin-relay/macro'
 import {commitMutation} from 'react-relay'
+import {RecordProxy} from 'relay-runtime'
+import {EndSprintPokerMutation_team$data} from '~/__generated__/EndSprintPokerMutation_team.graphql'
 import onMeetingRoute from '~/utils/onMeetingRoute'
-import {EndSprintPokerMutation_team} from '~/__generated__/EndSprintPokerMutation_team.graphql'
+import {EndSprintPokerMutation as TEndSprintPokerMutation} from '../__generated__/EndSprintPokerMutation.graphql'
 import {
   HistoryMaybeLocalHandler,
   OnNextHandler,
@@ -9,7 +11,7 @@ import {
   SharedUpdater,
   StandardMutation
 } from '../types/relayMutations'
-import {EndSprintPokerMutation as TEndSprintPokerMutation} from '../__generated__/EndSprintPokerMutation.graphql'
+import handleAddTimelineEvent from './handlers/handleAddTimelineEvent'
 import handleRemoveTasks from './handlers/handleRemoveTasks'
 import popEndMeetingToast from './toasts/popEndMeetingToast'
 
@@ -20,12 +22,33 @@ graphql`
       id
       endedAt
       teamId
+      commentCount
+      storyCount
+      name
+      phases {
+        phaseType
+        ... on EstimatePhase {
+          stages {
+            id
+          }
+        }
+      }
+      locked
+      organization {
+        id
+        viewerOrganizationUser {
+          id
+        }
+      }
     }
     team {
       id
       activeMeetings {
         id
       }
+    }
+    timelineEvent {
+      ...TimelineEventPokerComplete_timelineEvent @relay(mask: false)
     }
     removedTaskIds
   }
@@ -45,7 +68,7 @@ const mutation = graphql`
 `
 
 export const endSprintPokerTeamOnNext: OnNextHandler<
-  EndSprintPokerMutation_team,
+  EndSprintPokerMutation_team$data,
   OnNextHistoryContext
 > = (payload, context) => {
   const {isKill, meeting} = payload
@@ -62,12 +85,16 @@ export const endSprintPokerTeamOnNext: OnNextHandler<
   }
 }
 
-export const endSprintPokerTeamUpdater: SharedUpdater<EndSprintPokerMutation_team> = (
+export const endSprintPokerTeamUpdater: SharedUpdater<EndSprintPokerMutation_team$data> = (
   payload,
   {store}
 ) => {
   const removedTaskIds = payload.getValue('removedTaskIds')
   handleRemoveTasks(removedTaskIds as any, store)
+
+  const meeting = payload.getLinkedRecord('meeting') as RecordProxy
+  const timelineEvent = payload.getLinkedRecord('timelineEvent') as RecordProxy
+  handleAddTimelineEvent(meeting, timelineEvent, store)
 }
 
 const EndSprintPokerMutation: StandardMutation<

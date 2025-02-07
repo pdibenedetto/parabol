@@ -1,4 +1,3 @@
-import fetch from 'node-fetch'
 import {OAuth2Error, OAuth2Success} from '../../types/custom'
 
 type OAuth2Response = OAuth2Success | OAuth2Error
@@ -72,7 +71,8 @@ export const authorizeOAuth2 = async <
   }
   const tokenJson = (await oauth2Response.json()) as OAuth2Response
   if ('error' in tokenJson) {
-    return new Error(tokenJson.error)
+    const errorMessage = tokenJson.error || `Received null OAuth2 Error from ${authUrl}`
+    return new Error(errorMessage)
   }
   const {
     access_token: accessToken,

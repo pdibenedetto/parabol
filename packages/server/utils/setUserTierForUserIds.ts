@@ -1,77 +1,66 @@
-import getRethink from '../database/rethinkDriver'
-import {RDatum, RValue} from '../database/stricterR'
-import OrganizationUser from '../database/types/OrganizationUser'
-import User from '../database/types/User'
-import {updateUserTiersQuery} from '../postgres//queries/generated/updateUserTiersQuery'
-import getPg from '../postgres/getPg'
-import {TierEnum} from '../postgres/queries/generated/updateUserQuery'
-import {getUsersByIds} from '../postgres/queries/getUsersByIds'
-import catchAndLog from '../postgres/utils/catchAndLog'
-import segmentIo from './segmentIo'
+import isValid from '../graphql/isValid'
+import getKysely from '../postgres/getKysely'
+import {analytics} from './analytics/analytics'
+
+// MK: this is crazy spaghetti & needs to go away. See https://github.com/ParabolInc/parabol/issues/9932
+
+// This doesn't actually read any tier/trial fields on the 'OrganizationUser' object - these fields
+// come directly from 'Organization' instead. As a result, this can be run in parallel with
+// 'setTierForOrgUsers'.
+
+const setUserTierForUserId = async (userId: string) => {
+  const pg = getKysely()
+  const orgUsers = await pg
+    .selectFrom('OrganizationUser')
+    .selectAll()
+    .where('userId', '=', userId)
+    .where('removedAt', 'is', null)
+    .execute()
+
+  const orgIds = orgUsers.map((orgUser) => orgUser.orgId)
+  if (orgIds.length === 0) return
+
+  const organizations = await pg
+    .selectFrom('Organization')
+    .select(['trialStartDate', 'tier'])
+    .where('id', 'in', orgIds)
+    .execute()
+
+  const allTiers = organizations.map((org) => org.tier)
+  const allTrialStartDates = organizations
+    .map((org) => org.trialStartDate?.getTime())
+    .filter(isValid)
+  const maxTrialStartDate = Math.max(...allTrialStartDates)
+  const trialStartDate = maxTrialStartDate > 0 ? new Date(maxTrialStartDate) : null
+  const highestTier = allTiers.includes('enterprise')
+    ? 'enterprise'
+    : allTiers.includes('team')
+      ? 'team'
+      : 'starter'
+
+  await pg
+    .updateTable('User')
+    .set({
+      tier: highestTier,
+      trialStartDate
+    })
+    .where('id', '=', userId)
+    .execute()
+  const user = await pg
+    .selectFrom('User')
+    .select('email')
+    .where('id', '=', userId)
+    .executeTakeFirstOrThrow()
+
+  analytics.identify({
+    userId,
+    email: user.email,
+    highestTier
+  })
+}
 
 const setUserTierForUserIds = async (userIds: string[]) => {
-  const r = await getRethink()
-  await r
-    .table('User')
-    .getAll(r.args(userIds))
-    .update(
-      (user: RDatum<User>) => ({
-        tier: r
-          .table('OrganizationUser')
-          .getAll(user('id'), {index: 'userId'})
-          .filter({removedAt: null})('orgId')
-          .coerceTo('array')
-          .distinct()
-          .do((orgIds: RValue) =>
-            r.table('Organization').getAll(r.args(orgIds))('tier').distinct().coerceTo('array')
-          )
-          .do((tiers: RDatum<string[]>) => {
-            return r.branch(
-              tiers.contains('enterprise'),
-              'enterprise',
-              tiers.contains('team'),
-              'team',
-              'starter'
-            )
-          })
-      }),
-      {nonAtomic: true}
-    )
-    .run()
-
-  const userTiers = (await r
-    .table('OrganizationUser')
-    .getAll(r.args(userIds), {index: 'userId'})
-    .filter({removedAt: null})
-    .merge((orgUser: RDatum<OrganizationUser>) => ({
-      tier: r.table('Organization').get(orgUser('orgId'))('tier').default('starter')
-    }))
-    .group('userId')('tier')
-    .ungroup()
-    .map((row) => ({
-      id: row('group'),
-      tier: r.branch(
-        row('reduction').contains('enterprise'),
-        'enterprise',
-        row('reduction').contains('team'),
-        'team',
-        'starter'
-      )
-    }))
-    .run()) as {id: string; tier: TierEnum}[]
-  await catchAndLog(() => updateUserTiersQuery.run({users: userTiers}, getPg()))
-
-  const users = await getUsersByIds(userIds)
-  users.forEach((user) => {
-    user &&
-      segmentIo.identify({
-        userId: user.id,
-        traits: {
-          email: user.email,
-          highestTier: user.tier
-        }
-      })
-  })
+  return await Promise.all(userIds.map(setUserTierForUserId))
 }
 
 export default setUserTierForUserIds

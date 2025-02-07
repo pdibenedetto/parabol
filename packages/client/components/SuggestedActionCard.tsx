@@ -1,6 +1,6 @@
 import styled from '@emotion/styled'
 import {Cancel, ChangeHistory, GroupAdd, GroupWork, History, PersonAdd} from '@mui/icons-material'
-import React, {ReactNode} from 'react'
+import {ReactNode} from 'react'
 import useAtmosphere from '~/hooks/useAtmosphere'
 import DismissSuggestedActionMutation from '../mutations/DismissSuggestedActionMutation'
 import {DECELERATE, fadeIn} from '../styles/animation'
@@ -54,7 +54,7 @@ const FloatingSealIcon = styled('div')({
   width: 36,
   position: 'absolute',
   svg: {
-    fontSize: 36
+    fontSize: 20
   },
   top: 100,
   userSelect: 'none'

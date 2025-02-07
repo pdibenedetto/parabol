@@ -1,9 +1,11 @@
 const path = require('path')
 
-const transformRules = (projectRoot) => {
+const transformRules = (projectRoot, isProd) => {
   const CLIENT_ROOT = path.join(projectRoot, 'packages', 'client')
   const SERVER_ROOT = path.join(projectRoot, 'packages', 'server')
+  const EMBEDDER_ROOT = path.join(projectRoot, 'packages', 'embedder')
   const GQL_ROOT = path.join(projectRoot, 'packages', 'gql-executor')
+  const CHRONOS_ROOT = path.join(projectRoot, 'packages', 'chronos')
   const TOOLBOX_SRC = path.join(projectRoot, 'scripts', 'toolboxSrc')
   return [
     {
@@ -38,7 +40,9 @@ const transformRules = (projectRoot) => {
         {
           loader: '@sucrase/webpack-loader',
           options: {
-            transforms: ['jsx', 'typescript']
+            production: isProd,
+            transforms: ['jsx', 'typescript'],
+            jsxRuntime: 'automatic'
           }
         }
       ]
@@ -46,16 +50,17 @@ const transformRules = (projectRoot) => {
     {
       test: /\.(tsx?|js)$/,
       // things that don't need babel
-      include: [SERVER_ROOT, GQL_ROOT, TOOLBOX_SRC],
+      include: [SERVER_ROOT, EMBEDDER_ROOT, GQL_ROOT, CHRONOS_ROOT, TOOLBOX_SRC],
       // things that need babel
       exclude: path.join(SERVER_ROOT, 'email'),
       use: {
         loader: '@sucrase/webpack-loader',
         options: {
-          // imports is needed for old JS RethinkDB migration files
-          // otherwise exports.up is ignored when an import statement is there
-          // can remove when they're gone
-          transforms: ['jsx', 'typescript', 'imports']
+          production: isProd,
+          // imports is needed for applyEnvVarsToClientAssets since it uses CJS
+          // otherwise it gets ignored and treated as an unused export in the build
+          transforms: ['jsx', 'typescript', 'imports'],
+          jsxRuntime: 'automatic'
         }
       }
     },
@@ -83,7 +88,9 @@ const transformRules = (projectRoot) => {
         {
           loader: '@sucrase/webpack-loader',
           options: {
-            transforms: ['jsx', 'typescript']
+            production: isProd,
+            transforms: ['jsx', 'typescript'],
+            jsxRuntime: 'automatic'
           }
         }
       ]

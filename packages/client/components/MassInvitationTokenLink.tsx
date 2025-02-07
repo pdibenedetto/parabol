@@ -1,18 +1,17 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
 import ms from 'ms'
-import React, {useEffect} from 'react'
+import {useEffect} from 'react'
 import {PreloadedQuery, usePreloadedQuery} from 'react-relay'
 import useMutationProps from '~/hooks/useMutationProps'
 import CreateMassInvitationMutation from '~/mutations/CreateMassInvitationMutation'
-import makeMinWidthQuery from '~/utils/makeMinWidthMediaQuery'
+import {MassInvitationTokenLinkQuery} from '../__generated__/MassInvitationTokenLinkQuery.graphql'
 import useAtmosphere from '../hooks/useAtmosphere'
 import CopyShortLink from '../modules/meeting/components/CopyShortLink/CopyShortLink'
-import SendClientSegmentEventMutation from '../mutations/SendClientSegmentEventMutation'
 import {PALETTE} from '../styles/paletteV3'
 import {Threshold} from '../types/constEnums'
+import SendClientSideEvent from '../utils/SendClientSideEvent'
 import getMassInvitationUrl from '../utils/getMassInvitationUrl'
-import {MassInvitationTokenLinkQuery} from '../__generated__/MassInvitationTokenLinkQuery.graphql'
 
 const StyledCopyShortLink = styled(CopyShortLink)({
   borderRadius: 4,
@@ -20,14 +19,9 @@ const StyledCopyShortLink = styled(CopyShortLink)({
   color: PALETTE.SKY_500,
   fontSize: 15,
   fontWeight: 600,
-  margin: '0 0 32px',
   padding: 11,
   ':hover': {
     color: PALETTE.SKY_400
-  },
-  [makeMinWidthQuery(400)]: {
-    // make sure the length doesn't change the width
-    minWidth: 280
   }
 })
 
@@ -55,9 +49,7 @@ const query = graphql`
 
 const MassInvitationTokenLink = (props: Props) => {
   const {meetingId, queryRef} = props
-  const data = usePreloadedQuery<MassInvitationTokenLinkQuery>(query, queryRef, {
-    UNSTABLE_renderPolicy: 'full'
-  })
+  const data = usePreloadedQuery<MassInvitationTokenLinkQuery>(query, queryRef)
   const {viewer} = data
   const {team} = viewer
   const {id: teamId, massInvitation} = team!
@@ -73,17 +65,19 @@ const MassInvitationTokenLink = (props: Props) => {
       submitMutation()
       CreateMassInvitationMutation(atmosphere, {meetingId, teamId}, {onError, onCompleted})
     }
-    doFetch().catch()
-  }, [])
+    doFetch().catch(() => {
+      /*ignore*/
+    })
+  }, [isTokenValid, submitting])
   const onCopy = () => {
-    SendClientSegmentEventMutation(atmosphere, 'Copied Invite Link', {
+    SendClientSideEvent(atmosphere, 'Copied Invite Link', {
       teamId: teamId,
       meetingId: meetingId
     })
   }
   const displayToken = isTokenValid ? token : '············'
-  const linkLabel = `${window.__ACTION__.prblIn}/${displayToken}`
   const url = getMassInvitationUrl(displayToken)
+  const linkLabel = url.replace(/https?:\/\//, '')
   return (
     <StyledCopyShortLink
       icon='link'

@@ -1,6 +1,6 @@
-import Meeting from '../../../../database/types/Meeting'
-import {Team} from '../../../../postgres/queries/getTeamsByIds'
-
+import {Team, TeamPromptResponse} from '../../../../postgres/types'
+import User from '../../../../postgres/types/IUser'
+import {AnyMeeting} from '../../../../postgres/types/Meeting'
 export type NotifyResponse =
   | 'success'
   | {
@@ -10,11 +10,28 @@ export type NotifyResponse =
     }
 
 export type NotificationIntegration = {
-  startMeeting(meeting: Meeting, team: Team): Promise<NotifyResponse>
-  endMeeting(meeting: Meeting, team: Team): Promise<NotifyResponse>
-  startTimeLimit(scheduledEndTime: Date, meeting: Meeting, team: Team): Promise<NotifyResponse>
-  endTimeLimit(meeting: Meeting, team: Team): Promise<NotifyResponse>
-  integrationUpdated(): Promise<NotifyResponse>
+  startMeeting(meeting: AnyMeeting, team: Team, user: User): Promise<NotifyResponse>
+  updateMeeting?(meeting: AnyMeeting, team: Team, user: User): Promise<NotifyResponse>
+  endMeeting(
+    meeting: AnyMeeting,
+    team: Team,
+    user: User,
+    standupResponses: {user: User; response: TeamPromptResponse}[] | null
+  ): Promise<NotifyResponse>
+  startTimeLimit(
+    scheduledEndTime: Date,
+    meeting: AnyMeeting,
+    team: Team,
+    user: User
+  ): Promise<NotifyResponse>
+  endTimeLimit(meeting: AnyMeeting, team: Team, user: User): Promise<NotifyResponse>
+  integrationUpdated(user: User): Promise<NotifyResponse>
+  standupResponseSubmitted(
+    meeting: AnyMeeting,
+    team: Team,
+    user: User,
+    response: TeamPromptResponse
+  ): Promise<NotifyResponse>
 }
 
 export type NotificationIntegrationHelper<NotificationChannel> = (

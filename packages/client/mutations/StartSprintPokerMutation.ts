@@ -1,7 +1,7 @@
 import graphql from 'babel-plugin-relay/macro'
 import {commitMutation} from 'react-relay'
-import {HistoryLocalHandler, StandardMutation} from '../types/relayMutations'
 import {StartSprintPokerMutation as TStartSprintPokerMutation} from '../__generated__/StartSprintPokerMutation.graphql'
+import {HistoryLocalHandler, StandardMutation} from '../types/relayMutations'
 
 graphql`
   fragment StartSprintPokerMutation_team on StartSprintPokerSuccess {
@@ -11,12 +11,13 @@ graphql`
     team {
       ...MeetingsDashActiveMeetings @relay(mask: false)
     }
+    hasGcalError
   }
 `
 
 const mutation = graphql`
-  mutation StartSprintPokerMutation($teamId: ID!) {
-    startSprintPoker(teamId: $teamId) {
+  mutation StartSprintPokerMutation($teamId: ID!, $gcalInput: CreateGcalEventInput) {
+    startSprintPoker(teamId: $teamId, gcalInput: $gcalInput) {
       ... on ErrorPayload {
         error {
           message
@@ -39,9 +40,17 @@ const StartSprintPokerMutation: StandardMutation<TStartSprintPokerMutation, Hist
     onCompleted: (res, errors) => {
       onCompleted(res, errors)
       const {startSprintPoker} = res
-      const {meeting} = startSprintPoker
+      const {meeting, hasGcalError} = startSprintPoker
       if (!meeting) return
       const {id: meetingId} = meeting
+      if (hasGcalError) {
+        atmosphere.eventEmitter.emit('addSnackbar', {
+          key: `gcalError:${meetingId}`,
+          autoDismiss: 0,
+          showDismissButton: true,
+          message: `Sorry, we couldn't create your Google Calendar event`
+        })
+      }
       history.push(`/meet/${meetingId}`)
     }
   })

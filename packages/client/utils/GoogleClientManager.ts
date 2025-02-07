@@ -1,11 +1,12 @@
 import {RouterProps} from 'react-router'
 import Atmosphere from '../Atmosphere'
+import {AUTH_DIALOG_WIDTH} from '../components/AuthenticationDialog'
 import {MenuMutationProps} from '../hooks/useMutationProps'
 import LoginWithGoogleMutation from '../mutations/LoginWithGoogleMutation'
 import {LocalStorageKey} from '../types/constEnums'
+import GoogleManager from './GoogleManager'
 import getAnonymousId from './getAnonymousId'
 import getOAuthPopupFeatures from './getOAuthPopupFeatures'
-import GoogleManager from './GoogleManager'
 import makeHref from './makeHref'
 
 class GoogleClientManager extends GoogleManager {
@@ -14,8 +15,10 @@ class GoogleClientManager extends GoogleManager {
     atmosphere: Atmosphere,
     mutationProps: MenuMutationProps,
     history: RouterProps['history'],
+    pageParams: string,
     invitationToken?: string,
-    loginHint?: string
+    loginHint?: string,
+    getOffsetTop?: () => number
   ) {
     const {submitting, onError, onCompleted, submitMutation} = mutationProps
     const providerState = Math.random().toString(36).substring(5)
@@ -30,10 +33,11 @@ class GoogleClientManager extends GoogleManager {
     })
     const uri = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
     submitMutation()
+    const top = getOffsetTop?.() || 56
     const popup = window.open(
       uri,
       'OAuth',
-      getOAuthPopupFeatures({width: 356, height: 530, top: 56})
+      getOAuthPopupFeatures({width: AUTH_DIALOG_WIDTH, height: 576, top})
     )
     const closeCheckerId = window.setInterval(() => {
       if (popup && popup.closed) {
@@ -42,14 +46,14 @@ class GoogleClientManager extends GoogleManager {
         window.removeEventListener('message', handler)
       }
     }, 100)
-    const handler = (event: MessageEvent) => {
+    const handler = async (event: MessageEvent) => {
       if (typeof event.data !== 'object' || event.origin !== window.location.origin || submitting) {
         return
       }
       const {code, state} = event.data
       if (state !== providerState || typeof code !== 'string') return
       window.clearInterval(closeCheckerId)
-      const segmentId = getAnonymousId()
+      const pseudoId = await getAnonymousId()
       window.localStorage.removeItem(LocalStorageKey.INVITATION_TOKEN)
       const handleComplete: typeof onCompleted = (...args) => {
         popup && popup.close()
@@ -57,7 +61,13 @@ class GoogleClientManager extends GoogleManager {
       }
       LoginWithGoogleMutation(
         atmosphere,
-        {code, segmentId, invitationToken: invitationToken || '', isInvitation: !!invitationToken},
+        {
+          code,
+          pseudoId,
+          invitationToken: invitationToken || '',
+          isInvitation: !!invitationToken,
+          params: pageParams
+        },
         {onError, onCompleted: handleComplete, history}
       )
       window.removeEventListener('message', handler)

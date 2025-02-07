@@ -29,12 +29,13 @@ const setFreshTokenIfNeeded = (connectionContext: ConnectionContext, tmsDB: stri
 }
 
 const query = `
-mutation ConnectSocket {
-  connectSocket {
+mutation ConnectSocket($socketInstanceId: ID!) {
+  connectSocket(socketInstanceId: $socketInstanceId) {
     tms
   }
 }`
 
+const INSTANCE_ID = `${process.env.SERVER_ID}:${process.pid}`
 const handleConnect = async (connectionContext: ConnectionContext) => {
   const {authToken, ip, id: socketId} = connectionContext
   const {rol} = authToken
@@ -42,7 +43,13 @@ const handleConnect = async (connectionContext: ConnectionContext) => {
     connectionContext.ready()
     return null
   }
-  const result = await publishInternalGQL({authToken, ip, query, socketId})
+  const result = await publishInternalGQL<{data: {connectSocket: {tms: string[]}}}>({
+    authToken,
+    ip,
+    query,
+    variables: {socketInstanceId: INSTANCE_ID},
+    socketId
+  })
   if (!result) return null
   const {data} = result
   const tms = data?.connectSocket?.tms

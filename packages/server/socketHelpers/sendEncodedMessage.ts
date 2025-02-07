@@ -24,8 +24,8 @@ const sendEncodedMessageBasedOnSocket = (
 
 const sendEncodedMessage = (context: ConnectionContext, object: any, syn = false) => {
   const {socket} = context
-  if (socket.getUserData().done) return
-
+  const done = isHttpResponse(socket) ? socket.done : socket.getUserData().done
+  if (done) return
   if (syn) {
     const mid = context.getMid()
     const message = JSON.stringify([object, mid])
@@ -36,4 +36,4 @@ const sendEncodedMessage = (context: ConnectionContext, object: any, syn = false
   }
 }
 
-export {sendEncodedMessage, sendAndPushToReliableQueue}
+export {sendAndPushToReliableQueue, sendEncodedMessage}

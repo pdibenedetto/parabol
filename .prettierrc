@@ -13,5 +13,9 @@
         "singleQuote": false
       }
     }
-  ]
+  ],
+  "plugins": ["prettier-plugin-organize-imports", "prettier-plugin-tailwindcss"],
+  "tailwindStylesheet": "./packages/client/styles/theme/global.css",
+  "tailwindFunctions": ["clsx", "cn", "twMerge"],
+  "tailwindConfig": "./tailwind.config.js"
 }

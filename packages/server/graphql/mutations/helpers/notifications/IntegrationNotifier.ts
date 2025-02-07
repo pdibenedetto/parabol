@@ -11,6 +11,11 @@ export const IntegrationNotifier: Notifier = {
       notifiers.map(async (notifier) => notifier.startMeeting(dataLoader, meetingId, teamId))
     )
   },
+  async updateMeeting(dataLoader, meetingId, teamId) {
+    await Promise.allSettled(
+      notifiers.map(async (notifier) => notifier.updateMeeting?.(dataLoader, meetingId, teamId))
+    )
+  },
   async endMeeting(dataLoader, meetingId, teamId) {
     await Promise.allSettled(
       notifiers.map(async (notifier) => notifier.endMeeting(dataLoader, meetingId, teamId))
@@ -31,6 +36,20 @@ export const IntegrationNotifier: Notifier = {
   async integrationUpdated(dataLoader, teamId, userId) {
     await Promise.allSettled(
       notifiers.map(async (notifier) => notifier.integrationUpdated(dataLoader, teamId, userId))
+    )
+  },
+  async standupResponseSubmitted(dataLoader, meetingId, teamId, userId) {
+    await Promise.allSettled(
+      notifiers.map(async (notifier) =>
+        notifier.standupResponseSubmitted(dataLoader, meetingId, teamId, userId)
+      )
+    )
+  },
+  async sendNotificationToUser(dataLoader, notificationId, userId) {
+    await Promise.allSettled(
+      notifiers.map(async (notifier) =>
+        notifier.sendNotificationToUser?.(dataLoader, notificationId, userId)
+      )
     )
   }
 }

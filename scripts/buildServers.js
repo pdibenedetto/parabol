@@ -5,20 +5,24 @@
  The pm2 executor & socketServer processes watch for changes to the output files.
  When a change is detected the pm2 process restarts, loading the new code.
 */
+require('sucrase/register')
 const webpack = require('webpack')
-const waitForRelayCompiler = require('./waitForRelayCompiler')
+const waitForFileExists = require('./waitForFileExists').default
+const path = require('path')
+const {Logger} = require('../packages/server/utils/Logger')
 
 const buildServers = async () => {
   const config = require('./webpack/dev.servers.config')
   const compiler = webpack(config)
-  await waitForRelayCompiler()
+  const queryMapExists = await waitForFileExists(path.join(__dirname, '../queryMap.json'), 20000)
+  if (!queryMapExists) throw Error('QueryMap Not Available. Run `yarn relay:build`')
   compiler.watch({aggregateTimeout: 100}, (err, stats) => {
     if (err) {
-      console.log('Webpack error:', err)
+      Logger.log('Webpack error:', err)
     }
-    const {errors} = stats.compilation
+    const errors = stats?.compilation?.errors ?? []
     if (errors.length > 0) {
-      console.log('COMPILATION ERRORS:', errors)
+      Logger.log('COMPILATION ERRORS:', errors)
     }
     /* servers finished rebuilding */
   })

@@ -1,13 +1,14 @@
 import styled from '@emotion/styled'
 import {Info as InfoIcon} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import React, {FormEvent} from 'react'
+import {FormEvent, useEffect} from 'react'
 import {useFragment} from 'react-relay'
+import {MattermostPanel_viewer$key} from '~/__generated__/MattermostPanel_viewer.graphql'
 import {MenuPosition} from '~/hooks/useCoords'
 import useForm from '~/hooks/useForm'
 import useTooltip from '~/hooks/useTooltip'
 import linkify from '~/utils/linkify'
-import {MattermostPanel_viewer$key} from '~/__generated__/MattermostPanel_viewer.graphql'
+import {AddIntegrationProviderMutation as TAddIntegrationProviderMutation} from '../../../../__generated__/AddIntegrationProviderMutation.graphql'
 import FlatButton from '../../../../components/FlatButton'
 import BasicInput from '../../../../components/InputField/BasicInput'
 import LabelHeading from '../../../../components/LabelHeading/LabelHeading'
@@ -20,7 +21,7 @@ import UpdateIntegrationProviderMutation from '../../../../mutations/UpdateInteg
 import {PALETTE} from '../../../../styles/paletteV3'
 import {Layout} from '../../../../types/constEnums'
 import Legitity from '../../../../validation/Legitity'
-import {AddIntegrationProviderMutationResponse} from '../../../../__generated__/AddIntegrationProviderMutation.graphql'
+import NotificationSettings from './NotificationSettings'
 
 interface Props {
   viewerRef: MattermostPanel_viewer$key
@@ -86,6 +87,7 @@ const MattermostPanel = (props: Props) => {
           integrations {
             mattermost {
               auth {
+                ...NotificationSettings_auth
                 provider {
                   id
                   webhookUrl
@@ -119,6 +121,12 @@ const MattermostPanel = (props: Props) => {
       }
     }
   })
+  // because we render this panel also when isConnectClicked, we cannot guarantee the serverWebhookUrl is correct on first render
+  useEffect(() => {
+    if (serverWebhookUrl && !fields.webhookUrl.value) {
+      fields.webhookUrl.resetValue(serverWebhookUrl)
+    }
+  }, [serverWebhookUrl])
 
   const {
     submitting,
@@ -145,6 +153,7 @@ const MattermostPanel = (props: Props) => {
           provider: {
             id: activeProvider.id,
             scope: 'team',
+            teamId,
             webhookProviderMetadataInput: {
               webhookUrl
             }
@@ -153,7 +162,7 @@ const MattermostPanel = (props: Props) => {
         {onError, onCompleted}
       )
     } else {
-      const handleCompleted = (res: AddIntegrationProviderMutationResponse) => {
+      const handleCompleted = (res: TAddIntegrationProviderMutation['response']) => {
         const {addIntegrationProvider} = res
         const {provider} = addIntegrationProvider
         if (!provider) return
@@ -215,6 +224,7 @@ const MattermostPanel = (props: Props) => {
         {fieldError && <StyledError>{fieldError}</StyledError>}
         {!fieldError && mutationError && <StyledError>{mutationError.message}</StyledError>}
       </form>
+      {auth && <NotificationSettings auth={auth} />}
     </MattermostPanelStyles>
   )
 }

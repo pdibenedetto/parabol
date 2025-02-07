@@ -1,31 +1,34 @@
-import Redis from 'ioredis'
 import ms from 'ms'
 import GQLExecutorChannelId from '../../client/shared/gqlIds/GQLExecutorChannelId'
+import RedisInstance from './RedisInstance'
 import numToBase64 from './numToBase64'
 import sendToSentry from './sendToSentry'
 
 const STANDARD_TIMEOUT = ms('10s')
-const ADHOC_TIMEOUT = ms('1m')
+const LONG_TIMEOUT = ms('60s')
+const ADHOC_TIMEOUT = ms('10m')
 
 interface Job {
   resolve: (payload: any) => void
   timeoutId: NodeJS.Timeout
 }
 
-const {SERVER_ID, REDIS_URL} = process.env
+const {SERVER_ID} = process.env
 
 interface BaseRequest {
   executorServerId?: string
   isAdHoc?: boolean
+  longRunning?: boolean
 }
 
 export default class PubSubPromise<Request extends BaseRequest, Response> {
   jobs = {} as {[jobId: string]: Job}
-  publisher = new Redis(REDIS_URL!, {connectionName: 'pubsubPromise_pub'})
-  subscriber = new Redis(REDIS_URL!, {connectionName: 'pubsubPromise_sub'})
+  publisher = new RedisInstance('pubsubPromise_pub')
+  subscriber = new RedisInstance('pubsubPromise_sub')
   subChannel: string
   stream: string
   jobCounter = 0
+  carrier: any
 
   constructor(stream: string, subChannel: string) {
     this.stream = stream
@@ -46,12 +49,12 @@ export default class PubSubPromise<Request extends BaseRequest, Response> {
     this.subscriber.subscribe(this.subChannel)
   }
 
-  publish = (request: Request) => {
-    return new Promise<Response>((resolve, reject) => {
+  publish = <NarrowResponse = Response>(request: Request) => {
+    return new Promise<NarrowResponse>((resolve, reject) => {
       const nextJob = numToBase64(this.jobCounter++)
       const jobId = `${SERVER_ID}:${nextJob}`
-      const {isAdHoc} = request
-      const timeout = isAdHoc ? ADHOC_TIMEOUT : STANDARD_TIMEOUT
+      const {isAdHoc, longRunning} = request
+      const timeout = isAdHoc ? ADHOC_TIMEOUT : longRunning ? LONG_TIMEOUT : STANDARD_TIMEOUT
       const timeoutId = setTimeout(() => {
         delete this.jobs[jobId]
         reject(new Error('TIMEOUT'))

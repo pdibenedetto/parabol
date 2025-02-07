@@ -1,8 +1,8 @@
 import graphql from 'babel-plugin-relay/macro'
 import {commitMutation} from 'react-relay'
-import handleSuccessfulLogin from '~/utils/handleSuccessfulLogin'
-import {HistoryLocalHandler, StandardMutation} from '../types/relayMutations'
+import {handleSuccessfulLogin} from '~/utils/handleSuccessfulLogin'
 import {LoginWithPasswordMutation as TLoginWithPasswordMutation} from '../__generated__/LoginWithPasswordMutation.graphql'
+import {HistoryLocalHandler, StandardMutation} from '../types/relayMutations'
 import {handleAcceptTeamInvitationErrors} from './AcceptTeamInvitationMutation'
 import handleAuthenticationRedirect from './handlers/handleAuthenticationRedirect'
 
@@ -10,18 +10,14 @@ const mutation = graphql`
   mutation LoginWithPasswordMutation(
     $email: ID!
     $password: String!
-    $invitationToken: ID! = ""
+    $invitationToken: ID!
     $isInvitation: Boolean!
   ) {
     loginWithPassword(email: $email, password: $password) {
       error {
         message
       }
-      authToken
-      user {
-        tms
-        ...UserAnalyticsFrag @relay(mask: false)
-      }
+      ...handleSuccessfulLogin_UserLogInPayload @relay(mask: false)
     }
     acceptTeamInvitation(invitationToken: $invitationToken) @include(if: $isInvitation) {
       ...AcceptTeamInvitationMutationReply @relay(mask: false)
@@ -44,7 +40,7 @@ const LoginWithPasswordMutation: StandardMutation<
       handleAcceptTeamInvitationErrors(atmosphere, acceptTeamInvitation)
       if (!uiError && !errors) {
         handleSuccessfulLogin(loginWithPassword)
-        const authToken = acceptTeamInvitation?.authToken ?? loginWithPassword.authToken
+        const authToken = acceptTeamInvitation?.authToken || loginWithPassword.authToken!
         atmosphere.setAuthToken(authToken)
         handleAuthenticationRedirect(acceptTeamInvitation, {atmosphere, history})
       }

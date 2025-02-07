@@ -1,7 +1,6 @@
 import styled from '@emotion/styled'
 import {Menu} from '@mui/icons-material'
 import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
 import {useFragment} from 'react-relay'
 import {PALETTE} from '~/styles/paletteV3'
 import {ICON_SIZE} from '~/styles/typographyV2'
@@ -9,7 +8,7 @@ import {AppBar} from '~/types/constEnums'
 import {MobileDashTopBar_query$key} from '../__generated__/MobileDashTopBar_query.graphql'
 import PlainButton from './PlainButton/PlainButton'
 import TopBarHelp from './TopBarHelp'
-import TopBarIcon from './TopBarIcon'
+//import TopBarIcon from './TopBarIcon'
 import TopBarNotifications from './TopBarNotifications'
 
 interface Props {
@@ -79,8 +78,8 @@ const MobileDashTopBar = (props: Props) => {
         <Title>{pageName}</Title>
       </LeftNavHeader>
       <TopBarIcons>
-        {/* Disable search in mobile for now */}
-        {false && <TopBarIcon icon={'search'} ariaLabel={'Search'} />}
+        {/* Disable search in mobile for now
+            <TopBarIcon icon={'search'} ariaLabel={'Search'} />*/}
         <TopBarHelp />
         <TopBarNotifications queryRef={data || null} />
       </TopBarIcons>

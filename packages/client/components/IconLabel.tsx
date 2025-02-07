@@ -17,15 +17,17 @@ import {
   MoreVert,
   OpenInNew,
   PersonPin,
-  Publish,
   RemoveCircle,
   Reply,
   Search,
   SentimentSatisfied,
+  TaskAlt,
+  Tune,
   UnfoldMore,
-  WebAsset
+  WebAsset,
+  Widgets
 } from '@mui/icons-material'
-import React, {forwardRef, ReactNode} from 'react'
+import {ReactNode, forwardRef} from 'react'
 
 const LabelBlock = styled('div')({
   alignItems: 'center',
@@ -95,7 +97,9 @@ const IconLabel = forwardRef((props: Props, ref: any) => {
             arrow_forward: <ArrowForward />,
             archive: <Archive />,
             close: <Close />,
-            publish: <Publish />
+            tune: <Tune />,
+            task_alt: <TaskAlt />,
+            widgets: <Widgets />
           }[icon]
         }
       </StyledIcon>

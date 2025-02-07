@@ -1,12 +1,12 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {useState} from 'react'
-import {useFragment, PreloadedQuery, usePreloadedQuery} from 'react-relay'
+import {useState} from 'react'
+import {PreloadedQuery, useFragment, usePreloadedQuery} from 'react-relay'
 import useGetUsedServiceTaskIds from '~/hooks/useGetUsedServiceTaskIds'
-import useAtmosphere from '../hooks/useAtmosphere'
-import PersistJiraSearchQueryMutation from '../mutations/PersistJiraSearchQueryMutation'
 import {JiraScopingSearchResultsQuery} from '../__generated__/JiraScopingSearchResultsQuery.graphql'
 import {JiraScopingSearchResults_meeting$key} from '../__generated__/JiraScopingSearchResults_meeting.graphql'
+import useAtmosphere from '../hooks/useAtmosphere'
+import PersistJiraSearchQueryMutation from '../mutations/PersistJiraSearchQueryMutation'
 import IntegrationScopingNoResults from './IntegrationScopingNoResults'
 import JiraScopingSelectAllIssues from './JiraScopingSelectAllIssues'
 import NewIntegrationRecordButton from './NewIntegrationRecordButton'
@@ -87,9 +87,7 @@ const JiraScopingSearchResults = (props: Props) => {
     `,
     meetingRef
   )
-  const data = usePreloadedQuery<JiraScopingSearchResultsQuery>(query, queryRef, {
-    UNSTABLE_renderPolicy: 'full'
-  })
+  const data = usePreloadedQuery<JiraScopingSearchResultsQuery>(query, queryRef)
   const {viewer} = data
   const atlassian = viewer?.teamMember!.integrations.atlassian ?? null
   const issues = atlassian?.issues ?? null

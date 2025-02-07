@@ -1,9 +1,13 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {ChangeEvent, FormEvent, useState} from 'react'
+import * as React from 'react'
+import {ChangeEvent, FormEvent, useState} from 'react'
 import {useFragment} from 'react-relay'
+import {NewTeamForm_organizations$key} from '../../../../__generated__/NewTeamForm_organizations.graphql'
+import Checkbox from '../../../../components/Checkbox'
 import DashHeaderTitle from '../../../../components/DashHeaderTitle'
 import FieldLabel from '../../../../components/FieldLabel/FieldLabel'
+import BasicTextArea from '../../../../components/InputField/BasicTextArea'
 import Panel from '../../../../components/Panel/Panel'
 import PrimaryButton from '../../../../components/PrimaryButton'
 import Radio from '../../../../components/Radio/Radio'
@@ -14,13 +18,13 @@ import useMutationProps from '../../../../hooks/useMutationProps'
 import useRouter from '../../../../hooks/useRouter'
 import AddOrgMutation from '../../../../mutations/AddOrgMutation'
 import AddTeamMutation from '../../../../mutations/AddTeamMutation'
-import SendClientSegmentEventMutation from '../../../../mutations/SendClientSegmentEventMutation'
 import {PALETTE} from '../../../../styles/paletteV3'
 import {Threshold} from '../../../../types/constEnums'
+import SendClientSideEvent from '../../../../utils/SendClientSideEvent'
 import linkify from '../../../../utils/linkify'
+import parseEmailAddressList from '../../../../utils/parseEmailAddressList'
 import Legitity from '../../../../validation/Legitity'
 import teamNameValidation from '../../../../validation/teamNameValidation'
-import {NewTeamForm_organizations$key} from '../../../../__generated__/NewTeamForm_organizations.graphql'
 import NewTeamOrgPicker from '../../../team/components/NewTeamOrgPicker'
 import NewTeamFormBlock from './NewTeamFormBlock'
 import NewTeamFormOrgName from './NewTeamFormOrgName'
@@ -98,6 +102,15 @@ interface Props {
 
 const NewTeamForm = (props: Props) => {
   const {isInitiallyNewOrg, organizationsRef} = props
+
+  graphql`
+    fragment NewTeamForm_teams on Team @relay(plural: true) {
+      teamMembers {
+        email
+        isSelf
+      }
+    }
+  `
   const organizations = useFragment(
     graphql`
       fragment NewTeamForm_organizations on Organization @relay(plural: true) {
@@ -105,8 +118,9 @@ const NewTeamForm = (props: Props) => {
         id
         lockedAt
         name
-        teams {
+        allTeams {
           name
+          ...NewTeamForm_teams @relay(mask: false)
         }
       }
     `,
@@ -114,8 +128,18 @@ const NewTeamForm = (props: Props) => {
   )
   const [isNewOrg, setIsNewOrg] = useState(isInitiallyNewOrg)
   const [orgId, setOrgId] = useState('')
+  const [rawInvitees, setRawInvitees] = useState('')
+  const [invitees, setInvitees] = useState([] as string[])
+  const [isSubmitted, setIsSubmitted] = useState(false)
   const lockedSelectedOrg = organizations.find((org) => org.id === orgId && org.lockedAt)
+  const [inviteAll, setInviteAll] = useState(false)
   const disableFields = !!lockedSelectedOrg && !isNewOrg
+  const selectedOrg = organizations.find((org) => org.id === orgId)
+  const selectedOrgTeamMemberEmails = selectedOrg?.allTeams.flatMap(({teamMembers}) =>
+    teamMembers.filter(({isSelf}) => !isSelf).map(({email}) => email)
+  )
+  const uniqueEmailsFromSelectedOrg = Array.from(new Set(selectedOrgTeamMemberEmails))
+  const showInviteAll = !!(!isNewOrg && selectedOrg && uniqueEmailsFromSelectedOrg.length)
 
   const validateOrgName = (orgName: string) => {
     return new Legitity(orgName)
@@ -129,9 +153,8 @@ const NewTeamForm = (props: Props) => {
   const validateTeamName = (teamName: string) => {
     let teamNames: string[] = []
     if (!isNewOrg) {
-      const org = organizations.find((org) => org.id === orgId)
-      if (org) {
-        teamNames = org.teams.map((team) => team.name)
+      if (selectedOrg) {
+        teamNames = selectedOrg.allTeams.map((team) => team.name)
       }
     }
     return teamNameValidation(teamName, teamNames)
@@ -172,7 +195,7 @@ const NewTeamForm = (props: Props) => {
       const newTeam = {
         name: teamName
       }
-      const variables = {newTeam, orgName}
+      const variables = {newTeam, orgName, invitees}
       submitMutation()
       AddOrgMutation(atmosphere, variables, {history, onError, onCompleted})
     } else {
@@ -181,17 +204,69 @@ const NewTeamForm = (props: Props) => {
         orgId
       }
       submitMutation()
-      AddTeamMutation(atmosphere, {newTeam}, {onError, onCompleted, history})
+      AddTeamMutation(atmosphere, {newTeam, invitees}, {onError, onCompleted, history})
     }
   }
 
   const goToBilling = () => {
-    SendClientSegmentEventMutation(atmosphere, 'Upgrade CTA Clicked', {
+    SendClientSideEvent(atmosphere, 'Upgrade CTA Clicked', {
       upgradeCTALocation: 'createTeam',
       orgId,
       upgradeTier: 'team'
     })
     history.push(`/me/organizations/${orgId}`)
+  }
+
+  const onInvitesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (isSubmitted) setIsSubmitted(false)
+    const nextValue = e.target.value
+    if (rawInvitees === nextValue) return
+    const {parsedInvitees, invalidEmailExists} = parseEmailAddressList(nextValue)
+    const allInvitees = parsedInvitees
+      ? (parsedInvitees.map((invitee: any) => invitee.address) as string[])
+      : []
+    const uniqueInvitees = Array.from(new Set(allInvitees))
+    if (invalidEmailExists) {
+      const lastValidEmail = uniqueInvitees[uniqueInvitees.length - 1]
+      lastValidEmail
+        ? onError(new Error(`Invalid email(s) after ${lastValidEmail}`))
+        : onError(new Error(`Invalid email(s)`))
+    } else {
+      onCompleted()
+    }
+    setRawInvitees(nextValue)
+    setInvitees(uniqueInvitees)
+  }
+
+  const handleToggleInviteAll = () => {
+    if (!inviteAll) {
+      const {parsedInvitees} = parseEmailAddressList(rawInvitees)
+      const currentInvitees = parsedInvitees
+        ? (parsedInvitees.map((invitee: any) => invitee.address) as string[])
+        : []
+      const emailsToAdd = uniqueEmailsFromSelectedOrg.filter(
+        (email) => !currentInvitees.includes(email)
+      )
+      const lastInvitee = currentInvitees[currentInvitees.length - 1]
+      const formattedCurrentInvitees =
+        currentInvitees.length && lastInvitee && !lastInvitee.endsWith(',')
+          ? `${currentInvitees.join(', ')}, `
+          : currentInvitees.join(', ')
+      setRawInvitees(`${formattedCurrentInvitees}${emailsToAdd.join(', ')}`)
+      setInvitees([...currentInvitees, ...emailsToAdd])
+    } else {
+      const {parsedInvitees} = parseEmailAddressList(rawInvitees)
+      const currentInvitees = parsedInvitees
+        ? (parsedInvitees as emailAddresses.ParsedMailbox[]).map((invitee) => invitee.address)
+        : []
+      const remainingInvitees = currentInvitees.filter(
+        (email) => !uniqueEmailsFromSelectedOrg.includes(email)
+      )
+      setRawInvitees(remainingInvitees.join(', '))
+      setInvitees(remainingInvitees)
+    }
+    onCompleted()
+    setInviteAll((inviteAll) => !inviteAll)
   }
 
   return (
@@ -230,6 +305,7 @@ const NewTeamForm = (props: Props) => {
             placeholder='My new organization'
           />
           <NewTeamFormTeamName
+            autoFocus
             error={fields.teamName.error}
             disabled={disableFields}
             onChange={onChange}
@@ -243,6 +319,23 @@ const NewTeamForm = (props: Props) => {
               <StyledLink onClick={goToBilling}>Upgrade</StyledLink>
               {' to create more teams.'}
             </WarningMsg>
+          )}
+          <p className='mt-8 mb-3 text-xs leading-4'>
+            {'Invite others to your new team. Invites expire in 30 days.'}
+          </p>
+          <BasicTextArea
+            name='rawInvitees'
+            onChange={onInvitesChange}
+            placeholder='email@example.co, another@example.co'
+            value={rawInvitees}
+          />
+          {showInviteAll && (
+            <div className='flex cursor-pointer items-center pt-2' onClick={handleToggleInviteAll}>
+              <Checkbox active={inviteAll} />
+              <label htmlFor='checkbox' className='text-gray-700 ml-2 cursor-pointer'>
+                {`Invite team members from ${selectedOrg.name}`}
+              </label>
+            </div>
           )}
           <StyledButton disabled={disableFields} size='large' waiting={submitting}>
             {isNewOrg ? 'Create Team & Org' : 'Create Team'}

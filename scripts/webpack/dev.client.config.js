@@ -6,6 +6,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin')
 const vendors = require('../../dev/dll/vendors')
 const clientTransformRules = require('./utils/clientTransformRules')
 const getProjectRoot = require('./utils/getProjectRoot')
+const {makeOAuth2Redirect} = require('../../packages/server/utils/makeOAuth2Redirect')
 
 const PROJECT_ROOT = getProjectRoot()
 const CLIENT_ROOT = path.join(PROJECT_ROOT, 'packages', 'client')
@@ -22,6 +23,7 @@ module.exports = {
   },
   stats: 'errors-warnings',
   devServer: {
+    allowedHosts: ['localhost', 'host.docker.internal'],
     client: {
       logging: 'warn'
     },
@@ -49,21 +51,28 @@ module.exports = {
     historyApiFallback: true,
     port: PORT,
     proxy: [
-      'sse',
-      'sse-ping',
-      'jira-attachments',
-      'stripe',
-      'webhooks',
-      'graphql',
-      'intranet-graphql',
-      // important terminating / so saml-redirect doesn't get targeted, too
-      'saml/'
-    ].reduce((obj, name) => {
-      obj[`/${name}`] = {
+      ...[
+        'sse',
+        'sse-ping',
+        'jira-attachments',
+        'stripe',
+        'webhooks',
+        'graphql',
+        'intranet-graphql',
+        'self-hosted',
+        'mattermost',
+        // important terminating / so saml-redirect doesn't get targeted, too
+        'saml/'
+      ].map((name) => ({
+        context: [`/${name}`],
         target: `http://localhost:${SOCKET_PORT}`
+      })),
+      {
+        context: '/components',
+        pathRewrite: {'^/components': ''},
+        target: `http://localhost:3002`
       }
-      return obj
-    }, {})
+    ]
   },
   infrastructureLogging: {level: 'warn'},
   watchOptions: {
@@ -91,7 +100,9 @@ module.exports = {
     alias: {
       '~': CLIENT_ROOT,
       'parabol-client': CLIENT_ROOT,
-      static: STATIC_ROOT
+      static: STATIC_ROOT,
+      // this is for radix-ui, we import & transform ESM packages, but they can't find react/jsx-runtime
+      'react/jsx-runtime': require.resolve('react/jsx-runtime')
     },
     extensions: ['.js', '.json', '.ts', '.tsx'],
     fallback: {
@@ -120,15 +131,32 @@ module.exports = {
         github: process.env.GITHUB_CLIENT_ID,
         google: process.env.GOOGLE_OAUTH_CLIENT_ID,
         googleAnalytics: process.env.GA_TRACKING_ID,
-        segment: process.env.SEGMENT_WRITE_KEY,
+        mattermostDisabled: process.env.MATTERMOST_DISABLED === 'true',
+        mattermostGlobal: !!process.env.MATTERMOST_SECRET,
+        msTeamsDisabled: process.env.MSTEAMS_DISABLED === 'true',
         sentry: process.env.SENTRY_DSN,
         slack: process.env.SLACK_CLIENT_ID,
         stripe: process.env.STRIPE_PUBLISHABLE_KEY,
-        oauth2Redirect: process.env.OAUTH2_REDIRECT,
+        oauth2Redirect: makeOAuth2Redirect(),
+        hasOpenAI: !!process.env.OPEN_AI_API_KEY,
         prblIn: process.env.INVITATION_SHORTLINK,
         AUTH_INTERNAL_ENABLED: process.env.AUTH_INTERNAL_DISABLED !== 'true',
         AUTH_GOOGLE_ENABLED: process.env.AUTH_GOOGLE_DISABLED !== 'true',
-        AUTH_SSO_ENABLED: process.env.AUTH_SSO_DISABLED !== 'true'
+        AUTH_MICROSOFT_ENABLED: process.env.AUTH_MICROSOFT_DISABLED !== 'true',
+        AUTH_SSO_ENABLED: process.env.AUTH_SSO_DISABLED !== 'true',
+        AMPLITUDE_WRITE_KEY: process.env.AMPLITUDE_WRITE_KEY,
+        microsoftTenantId: process.env.MICROSOFT_TENANT_ID,
+        microsoft: process.env.MICROSOFT_CLIENT_ID,
+        GLOBAL_BANNER_ENABLED: process.env.GLOBAL_BANNER_ENABLED === 'true',
+        GLOBAL_BANNER_TEXT: process.env.GLOBAL_BANNER_TEXT,
+        GLOBAL_BANNER_BG_COLOR: process.env.GLOBAL_BANNER_BG_COLOR,
+        GLOBAL_BANNER_COLOR: process.env.GLOBAL_BANNER_COLOR,
+        GIF_PROVIDER:
+          process.env.GIF_PROVIDER !== 'tenor'
+            ? process.env.GIF_PROVIDER
+            : process.env.TENOR_SECRET
+              ? 'tenor'
+              : ''
       })
     }),
     new ReactRefreshWebpackPlugin(),
@@ -136,7 +164,6 @@ module.exports = {
       __CLIENT__: true,
       __PRODUCTION__: false,
       __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
-      'process.env.DEBUG': JSON.stringify(process.env.DEBUG),
       __SOCKET_PORT__: JSON.stringify(process.env.SOCKET_PORT)
       // Environment variables go in the __ACTION__ object above, not here
       // This build may be deployed to many different environments
@@ -170,7 +197,8 @@ module.exports = {
           {
             loader: '@sucrase/webpack-loader',
             options: {
-              transforms: ['jsx']
+              transforms: ['jsx'],
+              jsxRuntime: 'automatic'
             }
           }
         ]

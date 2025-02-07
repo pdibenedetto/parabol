@@ -2,19 +2,21 @@ import GQLTrebuchetClient, {
   GQLHTTPClient,
   OperationPayload
 } from '@mattkrick/graphql-trebuchet-client'
-import getTrebuchet, {SocketTrebuchet, SSETrebuchet} from '@mattkrick/trebuchet-client'
+import getTrebuchet, {SSETrebuchet, SocketTrebuchet} from '@mattkrick/trebuchet-client'
 import EventEmitter from 'eventemitter3'
 import jwtDecode from 'jwt-decode'
 import {Disposable} from 'react-relay'
 import {RouterProps} from 'react-router'
 import {
   CacheConfig,
+  ConcreteRequest,
   Environment,
   FetchFunction,
-  fetchQuery,
+  FetchQueryFetchPolicy,
   GraphQLResponse,
   GraphQLTaggedNode,
   Network,
+  NormalizationLinkedField,
   Observable,
   OperationType,
   RecordSource,
@@ -23,17 +25,18 @@ import {
   Store,
   SubscribeFunction,
   UploadableMap,
-  Variables
+  Variables,
+  fetchQuery
 } from 'relay-runtime'
 import {Sink} from 'relay-runtime/lib/network/RelayObservable'
 import StrictEventEmitter from 'strict-event-emitter-types'
+import {InviteToTeamMutation_notification$data} from './__generated__/InviteToTeamMutation_notification.graphql'
 import {Snack, SnackbarRemoveFn} from './components/Snackbar'
 import handleInvalidatedSession from './hooks/handleInvalidatedSession'
 import {AuthToken} from './types/AuthToken'
 import {LocalStorageKey, TrebuchetCloseReason} from './types/constEnums'
 import handlerProvider from './utils/relay/handlerProvider'
 import sleep from './utils/sleep'
-import {InviteToTeamMutation_notification} from './__generated__/InviteToTeamMutation_notification.graphql'
 ;(RelayFeatureFlags as any).ENABLE_RELAY_CONTAINERS_SUSPENSE = false
 ;(RelayFeatureFlags as any).ENABLE_PRECISE_TYPE_REFINEMENT = true
 
@@ -76,7 +79,7 @@ export interface AtmosphereEvents {
   removeSnackbar: (filterFn: SnackbarRemoveFn) => void
   focusAgendaInput: () => void
   inviteToTeam: (
-    notification: NonNullable<InviteToTeamMutation_notification['teamInvitationNotification']>
+    notification: NonNullable<InviteToTeamMutation_notification$data['teamInvitationNotification']>
   ) => void
   newSubscriptionClient: () => void
   removeGitHubRepo: () => void
@@ -100,13 +103,14 @@ export default class Atmosphere extends Environment {
   } = {}
   retries = new Set<() => void>()
   subscriptions: Subscriptions = {}
+  // Our server only sends a single field per subscription, but relay requires every requested field
+  // This object makes the server response whole without increasing the payload size
+  subscriptionInterfaces = {} as Record<string, Record<string, null>>
   eventEmitter: StrictEventEmitter<EventEmitter, AtmosphereEvents> = new EventEmitter()
   queryCache = {} as {[key: string]: GraphQLResponse}
   upgradeTransportPromise: Promise<void> | null = null
   // it's only null before login, so it's just a little white lie
   viewerId: string = null!
-  /** @deprecated */
-  userId: string | null = null
   tabCheckChannel?: BroadcastChannel
   constructor() {
     super({
@@ -194,7 +198,29 @@ export default class Atmosphere extends Environment {
 
   handleSubscribe: SubscribeFunction = (operation, variables, _cacheConfig) => {
     return Observable.create((sink) => {
-      this.handleSubscribePromise(operation, variables, _cacheConfig, sink).catch()
+      const _next = sink.next
+      sink.next = (value: any) => {
+        const {data} = value
+        const subscriptionName = data ? Object.keys(data)[0] : undefined
+        const nullObj = this.subscriptionInterfaces[subscriptionName!]
+        const nextObj =
+          nullObj && subscriptionName
+            ? {
+                ...value,
+                data: {
+                  ...data,
+                  [subscriptionName]: {
+                    ...nullObj,
+                    ...data[subscriptionName]
+                  }
+                }
+              }
+            : value
+        _next(nextObj)
+      }
+      this.handleSubscribePromise(operation, variables, _cacheConfig, sink).catch(() => {
+        /*ignore*/
+      })
     })
   }
 
@@ -245,6 +271,9 @@ export default class Atmosphere extends Environment {
           'Cannot establish connection. Behind a firewall? Reach out for support: love@parabol.co'
       })
       console.error('Cannot connect!')
+      // this may be reached if the auth token was deemed invalid by the server
+      this.setAuthToken(null)
+      window.location.href = '/'
       return
     }
     this.transport = new GQLTrebuchetClient(trebuchet)
@@ -271,13 +300,27 @@ export default class Atmosphere extends Environment {
     let data = request.id
     if (!__PRODUCTION__) {
       try {
-        const queryMap = await import('../../queryMap.json').catch()
+        const queryMap = await import('../../queryMap.json').catch(() => {
+          /*ignore*/
+        })
         data = queryMap[request.id as keyof typeof queryMap] as string
       } catch (e) {
         return
       }
+      if (!data) console.error('QueryMap is incomplete. Run `yarn clean`')
     }
     const transport = uploadables ? this.baseHTTPTransport : this.transport
+    const errorCheckerSink: Sink<any> | undefined = sink
+      ? {
+          ...sink,
+          next: (value) => {
+            if (value.errors) {
+              console.error(value.errors)
+            }
+            return sink.next(value)
+          }
+        }
+      : undefined
     return transport.fetch(
       {
         [field]: data,
@@ -286,7 +329,7 @@ export default class Atmosphere extends Environment {
         uploadables: uploadables || undefined
       },
       // if sink is nully, then the server doesn't send a response
-      sink
+      errorCheckerSink
     )
   }
 
@@ -298,13 +341,22 @@ export default class Atmosphere extends Environment {
 
   fetchQuery = async <T extends OperationType>(
     taggedNode: GraphQLTaggedNode,
-    variables: Variables = {}
+    variables: Variables = {},
+    cacheConfig?: {
+      networkCacheConfig?: CacheConfig
+      fetchPolicy?: FetchQueryFetchPolicy
+    }
   ) => {
     let res: T['response']
     try {
-      res = await fetchQuery<T>(this, taggedNode, variables, {
-        fetchPolicy: 'store-or-network'
-      }).toPromise()
+      res = await fetchQuery<T>(
+        this,
+        taggedNode,
+        variables,
+        cacheConfig ?? {
+          fetchPolicy: 'store-or-network'
+        }
+      ).toPromise()
     } catch (e) {
       return null
     }
@@ -346,8 +398,8 @@ export default class Atmosphere extends Environment {
     window.location.href = '/'
   }
 
-  setAuthToken = async (authToken: string | null) => {
-    this.authToken = authToken
+  setAuthToken = async (authToken: string | null | undefined) => {
+    this.authToken = authToken || null
     if (!authToken) {
       this.authObj = null
       window.localStorage.removeItem(LocalStorageKey.APP_TOKEN_KEY)
@@ -374,8 +426,6 @@ export default class Atmosphere extends Environment {
     } else {
       this.viewerId = viewerId!
       window.localStorage.setItem(LocalStorageKey.APP_TOKEN_KEY, authToken)
-      // deprecated! will be removed soon
-      this.userId = viewerId
     }
   }
 
@@ -399,6 +449,13 @@ export default class Atmosphere extends Environment {
     this.querySubscriptions.push({queryKey, subKey})
   }
 
+  registerSubscription(subscriptionRequest: GraphQLTaggedNode) {
+    const request: ConcreteRequest = (subscriptionRequest as any).default ?? subscriptionRequest
+    const payload = request.operation.selections[0] as NormalizationLinkedField
+    const {selections, name} = payload
+    const nullObj = Object.fromEntries(selections.map(({name}: any) => [name, null]))
+    this.subscriptionInterfaces[name] = nullObj
+  }
   /*
    * When a subscription encounters an error, it affects the subscription itself,
    * the queries that depend on that subscription to stay valid,
@@ -472,6 +529,5 @@ export default class Atmosphere extends Environment {
     this.querySubscriptions = []
     this.subscriptions = {}
     this.viewerId = null!
-    this.userId = null // DEPRECATED
   }
 }

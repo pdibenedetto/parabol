@@ -1,10 +1,11 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {KeyboardEvent, RefObject, useEffect, useMemo, useRef, useState} from 'react'
+import * as React from 'react'
+import {KeyboardEvent, RefObject, useEffect, useMemo, useRef, useState} from 'react'
 import {useFragment} from 'react-relay'
-import {FragmentRefs} from 'relay-runtime'
 import useMutationProps from '~/hooks/useMutationProps'
 import usePokerDeckLeftEdge from '~/hooks/usePokerDeckLeftEdge'
+import {PokerCardDeck_meeting$key} from '../__generated__/PokerCardDeck_meeting.graphql'
 import useAtmosphere from '../hooks/useAtmosphere'
 import useEventCallback from '../hooks/useEventCallback'
 import useHotkey from '../hooks/useHotkey'
@@ -14,7 +15,6 @@ import usePokerCardLocation from '../hooks/usePokerCardLocation'
 import PokerAnnounceDeckHoverMutation from '../mutations/PokerAnnounceDeckHoverMutation'
 import VoteForPokerStoryMutation from '../mutations/VoteForPokerStoryMutation'
 import {BezierCurve, PokerCards} from '../types/constEnums'
-import {PokerCardDeck_meeting$key} from '../__generated__/PokerCardDeck_meeting.graphql'
 import PokerCard from './PokerCard'
 
 const Deck = styled('div')<{left: number; isSpectating: boolean}>(({left, isSpectating}) => ({
@@ -31,11 +31,6 @@ const Deck = styled('div')<{left: number; isSpectating: boolean}>(({left, isSpec
 interface Props {
   meeting: PokerCardDeck_meeting$key
   estimateAreaRef: RefObject<HTMLDivElement>
-}
-
-interface Card {
-  readonly label: string
-  readonly ' $fragmentRefs': FragmentRefs<'PokerCard_scaleValue'>
 }
 
 const swipe = {
@@ -221,17 +216,17 @@ const PokerCardDeck = (props: Props) => {
 
     if ((event as KeyboardEvent).key === 'ArrowUp') {
       if (typeof selectedIdx === 'undefined' || selectedIdx === cards.length - 1) {
-        vote((cards[0] as Card).label)
+        vote(cards[0]!.label)
       } else {
-        vote((cards[selectedIdx + 1] as Card).label)
+        vote(cards[selectedIdx + 1]!.label)
       }
     }
 
     if ((event as KeyboardEvent).key === 'ArrowDown') {
       if (typeof selectedIdx === 'undefined' || selectedIdx === 0) {
-        vote((cards[cards.length - 1] as Card).label)
+        vote(cards[cards.length - 1]!.label)
       } else {
-        vote((cards[selectedIdx - 1] as Card).label)
+        vote(cards[selectedIdx - 1]!.label)
       }
     }
   }

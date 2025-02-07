@@ -1,19 +1,21 @@
+import {generateText} from '@tiptap/core'
 import {GraphQLID, GraphQLNonNull, GraphQLString} from 'graphql'
 import {SubscriptionChannel} from 'parabol-client/types/constEnums'
-import extractTextFromDraftString from 'parabol-client/utils/draftjs/extractTextFromDraftString'
 import isPhaseComplete from 'parabol-client/utils/meetings/isPhaseComplete'
-import getGroupSmartTitle from 'parabol-client/utils/smartGroup/getGroupSmartTitle'
-import normalizeRawDraftJS from 'parabol-client/validation/normalizeRawDraftJS'
 import stringSimilarity from 'string-similarity'
-import getRethink from '../../database/rethinkDriver'
-import Reflection from '../../database/types/Reflection'
+import {serverTipTapExtensions} from '../../../client/shared/tiptap/serverTipTapExtensions'
+import getKysely from '../../postgres/getKysely'
+import {toGoogleAnalyzedEntity} from '../../postgres/helpers/toGoogleAnalyzedEntity'
 import {getUserId, isTeamMember} from '../../utils/authorization'
+import {convertToTipTap} from '../../utils/convertToTipTap'
 import publish from '../../utils/publish'
 import standardError from '../../utils/standardError'
 import {GQLContext} from '../graphql'
 import UpdateReflectionContentPayload from '../types/UpdateReflectionContentPayload'
+import {getFeatureTier} from '../types/helpers/getFeatureTier'
 import getReflectionEntities from './helpers/getReflectionEntities'
-import updateSmartGroupTitle from './helpers/updateReflectionLocation/updateSmartGroupTitle'
+import getReflectionSentimentScore from './helpers/getReflectionSentimentScore'
+import updateGroupTitle from './helpers/updateGroupTitle'
 
 export default {
   type: UpdateReflectionContentPayload,
@@ -24,7 +26,7 @@ export default {
     },
     content: {
       type: new GraphQLNonNull(GraphQLString),
-      description: 'A stringified draft-js document containing thoughts'
+      description: 'A stringified TipTap JSONContent document containing thoughts'
     }
   },
   async resolve(
@@ -32,23 +34,29 @@ export default {
     {reflectionId, content}: {reflectionId: string; content: string},
     {authToken, dataLoader, socketId: mutatorId}: GQLContext
   ) {
-    const r = await getRethink()
+    const pg = getKysely()
     const operationId = dataLoader.share()
-    const now = new Date()
     const subOptions = {operationId, mutatorId}
 
     // AUTH
     const viewerId = getUserId(authToken)
-    const reflection = await r.table('RetroReflection').get(reflectionId).run()
+    const reflection = await dataLoader.get('retroReflections').load(reflectionId)
+    dataLoader.get('retroReflections').clear(reflectionId)
     if (!reflection) {
       return standardError(new Error('Reflection not found'), {userId: viewerId})
     }
-    const {creatorId, meetingId, reflectionGroupId} = reflection
-    const meeting = await dataLoader.get('newMeetings').load(meetingId)
+    const {creatorId, meetingId, reflectionGroupId, promptId} = reflection
+    const reflectPrompt = await dataLoader.get('reflectPrompts').load(promptId)
+    if (!reflectPrompt) {
+      return standardError(new Error('Category not found'), {userId: viewerId})
+    }
+    const {question} = reflectPrompt
+    const meeting = await dataLoader.get('newMeetings').loadNonNull(meetingId)
     const {endedAt, phases, teamId} = meeting
     if (!isTeamMember(authToken, teamId)) {
       return standardError(new Error('Team not found'), {userId: viewerId})
     }
+    const team = await dataLoader.get('teams').loadNonNull(teamId)
     if (endedAt) return standardError(new Error('Meeting already ended'), {userId: viewerId})
     if (isPhaseComplete('group', phases)) {
       return standardError(new Error('Meeting phase already ended'), {userId: viewerId})
@@ -58,34 +66,46 @@ export default {
     }
 
     // VALIDATION
-    const normalizedContent = normalizeRawDraftJS(content)
+    if (content && content.length > 2000) {
+      return {error: {message: 'Reflection content is too long'}}
+    }
+    const normalizedContent = convertToTipTap(content)
 
     // RESOLUTION
-    const plaintextContent = extractTextFromDraftString(normalizedContent)
+    const plaintextContent = generateText(normalizedContent, serverTipTapExtensions)
     const isVeryDifferent =
       stringSimilarity.compareTwoStrings(plaintextContent, reflection.plaintextContent) < 0.9
     const entities = isVeryDifferent
       ? await getReflectionEntities(plaintextContent)
       : reflection.entities
-    await r
-      .table('RetroReflection')
-      .get(reflectionId)
-      .update({
-        content: normalizedContent,
-        entities,
-        plaintextContent,
-        updatedAt: now
+    const sentimentScore =
+      getFeatureTier(team) !== 'starter'
+        ? isVeryDifferent
+          ? await getReflectionSentimentScore(question, plaintextContent)
+          : reflection.sentimentScore
+        : undefined
+    await pg
+      .updateTable('RetroReflection')
+      .set({
+        content: JSON.stringify(normalizedContent),
+        entities: toGoogleAnalyzedEntity(entities),
+        sentimentScore,
+        plaintextContent
       })
-      .run()
+      .where('id', '=', reflectionId)
+      .execute()
 
-    const reflectionsInGroup = (await r
-      .table('RetroReflection')
-      .getAll(reflectionGroupId, {index: 'reflectionGroupId'})
-      .filter({isActive: true})
-      .run()) as Reflection[]
+    const reflectionsInGroup = await dataLoader
+      .get('retroReflectionsByGroupId')
+      .load(reflectionGroupId)
 
-    const newTitle = getGroupSmartTitle(reflectionsInGroup)
-    await updateSmartGroupTitle(reflectionGroupId, newTitle)
+    await updateGroupTitle({
+      reflections: reflectionsInGroup,
+      reflectionGroupId,
+      meetingId,
+      teamId,
+      dataLoader
+    })
 
     const data = {meetingId, reflectionId}
     publish(

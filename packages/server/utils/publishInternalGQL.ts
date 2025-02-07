@@ -5,18 +5,20 @@ import sendToSentry from './sendToSentry'
 
 interface Options {
   socketId: string
-  ip: string
+  ip?: string
   query: string
+  variables?: Record<string, any>
   authToken: AuthToken
 }
 
-const publishInternalGQL = async (options: Options) => {
-  const {socketId, query, ip, authToken} = options
+const publishInternalGQL = async <NarrowResponse>(options: Options) => {
+  const {socketId, query, ip, authToken, variables} = options
   try {
-    return await getGraphQLExecutor().publish({
+    return await getGraphQLExecutor().publish<NarrowResponse>({
       socketId,
       authToken,
       query,
+      variables,
       ip,
       isPrivate: true
     })
@@ -28,7 +30,9 @@ const publishInternalGQL = async (options: Options) => {
         userId: getUserId(authToken),
         tags: {
           authToken: JSON.stringify(authToken),
-          query: query || ''
+          query: query || '',
+          variables: JSON.stringify(variables),
+          socketServerId: socketId
         }
       })
     } else {

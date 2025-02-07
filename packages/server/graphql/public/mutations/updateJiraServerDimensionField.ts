@@ -1,6 +1,4 @@
 import {SprintPokerDefaults, SubscriptionChannel} from 'parabol-client/types/constEnums'
-import getRethink from '../../../database/rethinkDriver'
-import MeetingPoker from '../../../database/types/MeetingPoker'
 import JiraServerRestManager from '../../../integrations/jiraServer/JiraServerRestManager'
 import {IntegrationProviderJiraServer} from '../../../postgres/queries/getIntegrationProvidersByIds'
 import upsertJiraServerDimensionFieldMap from '../../../postgres/queries/upsertJiraServerDimensionFieldMap'
@@ -13,7 +11,6 @@ const updateJiraServerDimensionField: MutationResolvers['updateJiraServerDimensi
   {dimensionName, issueType, fieldName, projectId, meetingId},
   {authToken, dataLoader, socketId: mutatorId}
 ) => {
-  const r = await getRethink()
   const operationId = dataLoader.share()
   const viewerId = getUserId(authToken)
   const subOptions = {mutatorId, operationId}
@@ -23,7 +20,10 @@ const updateJiraServerDimensionField: MutationResolvers['updateJiraServerDimensi
   if (!meeting) {
     return {error: {message: 'Invalid meetingId'}}
   }
-  const {teamId, templateRefId} = meeting as MeetingPoker
+  if (meeting.meetingType !== 'poker') {
+    return {error: {message: 'Not a poker meeting'}}
+  }
+  const {teamId, templateRefId} = meeting
   if (!isTeamMember(authToken, teamId)) {
     return {error: {message: 'Not on team'}}
   }
@@ -38,7 +38,7 @@ const updateJiraServerDimensionField: MutationResolvers['updateJiraServerDimensi
   const data = {teamId, meetingId}
 
   const auth = await dataLoader
-    .get('teamMemberIntegrationAuths')
+    .get('teamMemberIntegrationAuthsByServiceTeamAndUserId')
     .load({service: 'jiraServer', teamId, userId: viewerId})
   if (!auth) {
     return {error: {message: 'Not authenticated with JiraServer'}}

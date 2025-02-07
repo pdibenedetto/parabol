@@ -1,13 +1,14 @@
 import styled from '@emotion/styled'
 import graphql from 'babel-plugin-relay/macro'
-import React, {ReactNode, RefObject, useMemo, useRef} from 'react'
+import {ReactNode, RefObject, useMemo, useRef} from 'react'
 import {PreloadedQuery, usePreloadedQuery} from 'react-relay'
 import useAtmosphere from '~/hooks/useAtmosphere'
 import {useCoverable} from '~/hooks/useControlBarCovers'
 import {Breakpoint, DiscussionThreadEnum, MeetingControlBarEnum} from '~/types/constEnums'
+import {DiscussionThreadQuery} from '../__generated__/DiscussionThreadQuery.graphql'
+import {RetroDiscussPhase_meeting$data} from '../__generated__/RetroDiscussPhase_meeting.graphql'
 import {Elevation} from '../styles/elevation'
 import makeMinWidthMediaQuery from '../utils/makeMinWidthMediaQuery'
-import {DiscussionThreadQuery} from '../__generated__/DiscussionThreadQuery.graphql'
 import DiscussionThreadInput from './DiscussionThreadInput'
 import DiscussionThreadList, {DiscussionThreadables} from './DiscussionThreadList'
 import {isLocalPoll} from './Poll/local/newPoll'
@@ -35,14 +36,23 @@ interface Props {
   queryRef: PreloadedQuery<DiscussionThreadQuery>
   header?: ReactNode
   emptyState?: ReactNode
+  transcription?: RetroDiscussPhase_meeting$data['transcription']
+  showTranscription?: boolean
 }
 
 const DiscussionThread = (props: Props) => {
-  const {meetingContentRef, allowedThreadables, width, queryRef, header, emptyState} = props
+  const {
+    meetingContentRef,
+    allowedThreadables,
+    width,
+    queryRef,
+    header,
+    emptyState,
+    transcription,
+    showTranscription
+  } = props
   const {viewerId} = useAtmosphere()
   const isDrawer = !!width // hack to say this is in a poker meeting
-  const listRef = useRef<HTMLDivElement>(null)
-  const editorRef = useRef<HTMLTextAreaElement>(null)
   const ref = useRef<HTMLDivElement>(null)
   const data = usePreloadedQuery<DiscussionThreadQuery>(
     graphql`
@@ -54,7 +64,9 @@ const DiscussionThread = (props: Props) => {
             ...DiscussionThreadInput_discussion
             ...DiscussionThreadList_discussion
             id
-            replyingToCommentId
+            replyingTo {
+              id
+            }
             commentors {
               id
               preferredName
@@ -74,8 +86,7 @@ const DiscussionThread = (props: Props) => {
         }
       }
     `,
-    queryRef,
-    {UNSTABLE_renderPolicy: 'full'}
+    queryRef
   )
   const {viewer} = data
   const isExpanded =
@@ -97,7 +108,7 @@ const DiscussionThread = (props: Props) => {
     return <div>No discussion found!</div>
   }
 
-  const {replyingToCommentId, thread} = discussion
+  const {replyingTo, thread} = discussion
   const edges = thread?.edges ?? [] // should never happen, but Terry reported it in demo. likely relay error
   const threadables = edges.map(({node}) => node)
   const getMaxSortOrder = () => {
@@ -108,27 +119,26 @@ const DiscussionThread = (props: Props) => {
   return (
     <Wrapper isExpanded={isExpanded} width={width} ref={ref}>
       <DiscussionThreadList
-        dataCy='discuss-thread-list'
         discussion={discussion}
         allowedThreadables={allowedThreadables}
         preferredNames={preferredNames}
         threadables={threadables}
-        ref={listRef}
-        editorRef={editorRef}
         viewer={viewer}
         header={header}
         emptyState={emptyState}
+        transcription={transcription}
+        showTranscription={showTranscription}
       />
-      <DiscussionThreadInput
-        allowedThreadables={allowedThreadables}
-        dataCy='discuss-input'
-        editorRef={editorRef}
-        isDisabled={!!replyingToCommentId}
-        getMaxSortOrder={getMaxSortOrder}
-        discussion={discussion}
-        viewer={viewer}
-        isCreatingPoll={isCreatingPoll}
-      />
+      {!showTranscription && (
+        <DiscussionThreadInput
+          allowedThreadables={allowedThreadables}
+          isDisabled={!!replyingTo?.id}
+          getMaxSortOrder={getMaxSortOrder}
+          discussion={discussion}
+          viewer={viewer}
+          isCreatingPoll={isCreatingPoll}
+        />
+      )}
     </Wrapper>
   )
 }

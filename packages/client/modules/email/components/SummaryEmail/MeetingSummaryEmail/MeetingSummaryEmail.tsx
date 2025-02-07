@@ -1,10 +1,13 @@
 import graphql from 'babel-plugin-relay/macro'
-import React, {useEffect} from 'react'
-import {createFragmentContainer} from 'react-relay'
+import * as React from 'react'
+import {useEffect} from 'react'
+import {useFragment} from 'react-relay'
 import {CorsOptions} from '../../../../../types/cors'
 // import './reactEmailDeclarations'
 import SummarySheet from './SummarySheet'
 import ViewInBrowserHeader from './ViewInBrowserHeader'
+
+import {MeetingSummaryEmail_meeting$key} from 'parabol-client/__generated__/MeetingSummaryEmail_meeting.graphql'
 
 const parentStyles = {
   WebkitTextSizeAdjust: '100%',
@@ -20,7 +23,7 @@ export type MeetingSummaryReferrer = 'meeting' | 'email' | 'history'
 interface Props {
   emailCSVUrl: string
   isDemo?: boolean
-  meeting: any
+  meeting: MeetingSummaryEmail_meeting$key
   referrer: MeetingSummaryReferrer
   referrerUrl?: string
   teamDashUrl: string
@@ -32,20 +35,6 @@ interface Props {
 
 const pagePadding = {
   paddingTop: 24
-}
-
-declare module 'react' {
-  interface TdHTMLAttributes<T> {
-    height?: string | number
-    width?: string | number
-    bgcolor?: string
-  }
-  interface TableHTMLAttributes<T> {
-    align?: 'center' | 'left' | 'right'
-    bgcolor?: string
-    height?: string | number
-    width?: string | number
-  }
 }
 
 const PagePadding = () => {
@@ -61,7 +50,16 @@ const PagePadding = () => {
 }
 
 const MeetingSummaryEmail = (props: Props) => {
-  const {referrer, referrerUrl} = props
+  const {referrer, referrerUrl, meeting: meetingRef, teamDashUrl} = props
+  const meeting = useFragment(
+    graphql`
+      fragment MeetingSummaryEmail_meeting on NewMeeting {
+        id
+        ...SummarySheet_meeting
+      }
+    `,
+    meetingRef
+  )
   useEffect(() => {
     document.body.style.overflow = ''
     document.body.style.position = ''
@@ -77,7 +75,7 @@ const MeetingSummaryEmail = (props: Props) => {
                   <td>
                     <PagePadding />
                     <ViewInBrowserHeader referrerUrl={referrerUrl} referrer={referrer} />
-                    <SummarySheet {...props} />
+                    <SummarySheet {...props} meeting={meeting} teamDashUrl={teamDashUrl} />
                     <PagePadding />
                   </td>
                 </tr>
@@ -90,11 +88,4 @@ const MeetingSummaryEmail = (props: Props) => {
   )
 }
 
-export default createFragmentContainer(MeetingSummaryEmail, {
-  meeting: graphql`
-    fragment MeetingSummaryEmail_meeting on NewMeeting {
-      id
-      ...SummarySheet_meeting
-    }
-  `
-})
+export default MeetingSummaryEmail

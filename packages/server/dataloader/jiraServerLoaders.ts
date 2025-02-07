@@ -55,6 +55,8 @@ type TeamUserKey = {
 export type JiraServerProject = JiraServerRestProject & {
   service: 'jiraServer'
   providerId: number
+  userId: string
+  teamId: string
 }
 
 export const jiraServerIssue = (parent: RootDataLoader) => {
@@ -63,7 +65,7 @@ export const jiraServerIssue = (parent: RootDataLoader) => {
       const results = await Promise.allSettled(
         keys.map(async ({teamId, userId, issueId}) => {
           const auth = await parent
-            .get('teamMemberIntegrationAuths')
+            .get('teamMemberIntegrationAuthsByServiceTeamAndUserId')
             .load({service: 'jiraServer', teamId, userId})
 
           if (!auth) {
@@ -108,7 +110,7 @@ export const allJiraServerProjects = (parent: RootDataLoader) => {
     return Promise.all(
       keys.map(async ({userId, teamId}) => {
         const auth = await parent
-          .get('teamMemberIntegrationAuths')
+          .get('teamMemberIntegrationAuthsByServiceTeamAndUserId')
           .load({service: 'jiraServer', teamId, userId})
         if (!auth) return []
         const provider = await parent.get('integrationProviders').loadNonNull(auth.providerId)
@@ -123,7 +125,9 @@ export const allJiraServerProjects = (parent: RootDataLoader) => {
           .map((project) => ({
             ...project,
             service: 'jiraServer' as const,
-            providerId: provider.id
+            providerId: provider.id,
+            userId,
+            teamId
           }))
       })
     )
@@ -136,7 +140,7 @@ export const jiraServerFieldTypes = (parent: RootDataLoader) =>
       return Promise.all(
         keys.map(async ({teamId, userId, projectId, issueType}) => {
           const auth = await parent
-            .get('teamMemberIntegrationAuths')
+            .get('teamMemberIntegrationAuthsByServiceTeamAndUserId')
             .load({service: 'jiraServer', teamId, userId})
 
           if (!auth) {

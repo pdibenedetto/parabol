@@ -6,12 +6,11 @@ import {
 } from '../../../../client/types/constEnums'
 import AuthToken from '../../../database/types/AuthToken'
 import acceptTeamInvitationSafe from '../../../safeMutations/acceptTeamInvitation'
+import RedisLock from '../../../utils/RedisLock'
 import {analytics} from '../../../utils/analytics/analytics'
-import {getUserId, isAuthenticated} from '../../../utils/authorization'
+import {getUserId, isTeamMember} from '../../../utils/authorization'
 import encodeAuthToken from '../../../utils/encodeAuthToken'
 import publish from '../../../utils/publish'
-import RedisLock from '../../../utils/RedisLock'
-import segmentIo from '../../../utils/segmentIo'
 import activatePrevSlackAuth from '../../mutations/helpers/activatePrevSlackAuth'
 import handleInvitationToken from '../../mutations/helpers/handleInvitationToken'
 import {MutationResolvers} from '../resolverTypes'
@@ -23,16 +22,16 @@ const acceptTeamInvitation: MutationResolvers['acceptTeamInvitation'] = async (
   {invitationToken, notificationId},
   {authToken, dataLoader, socketId: mutatorId}
 ) => {
-  // AUTH WORKAROUND
-  if (!isAuthenticated(authToken) || !invitationToken) {
-    // Workaround for https://github.com/zalando-incubator/graphql-jit/issues/171
-    return {}
-  }
   const operationId = dataLoader.share()
   const subOptions = {mutatorId, operationId}
   const viewerId = getUserId(authToken)
 
   // VALIDATION
+  // This can happen if login with an invitation failed. We want to handle this gracefully so the client shows a nice error message
+  if (!viewerId) {
+    return {error: {message: InvitationTokenError.NOT_SIGNED_IN}}
+  }
+
   const viewer = await dataLoader.get('users').loadNonNull(viewerId)
   const invitationRes = await handleInvitationToken(
     invitationToken,
@@ -42,8 +41,13 @@ const acceptTeamInvitation: MutationResolvers['acceptTeamInvitation'] = async (
   )
   if (invitationRes.error) {
     const {error: message, teamId, meetingId} = invitationRes
-    if (message === InvitationTokenError.ALREADY_ACCEPTED) {
-      return {error: {message}, teamId, meetingId}
+    // If the user already accepted the invite, then we want to send the needed data together with the error, unless they were removed in the meantime
+    if (
+      message === InvitationTokenError.ALREADY_ACCEPTED &&
+      teamId &&
+      isTeamMember(authToken, teamId)
+    ) {
+      return {error: {message}, teamId, meetingId, teamMemberId: toTeamMemberId(teamId!, viewerId)}
     }
     return {error: {message}}
   }
@@ -51,7 +55,10 @@ const acceptTeamInvitation: MutationResolvers['acceptTeamInvitation'] = async (
   const {invitation} = invitationRes
   const {meetingId, teamId, invitedBy: inviterId} = invitation
   const acceptAt = invitation.meetingId ? 'meeting' : 'team'
-  const team = await dataLoader.get('teams').loadNonNull(teamId)
+  const [team, inviter] = await Promise.all([
+    dataLoader.get('teams').loadNonNull(teamId),
+    dataLoader.get('users').loadNonNull(inviterId)
+  ])
   const {orgId} = team
 
   // make sure that same invite can't be accepted at the same moment
@@ -73,11 +80,7 @@ const acceptTeamInvitation: MutationResolvers['acceptTeamInvitation'] = async (
     return {error: {message: approvalError.message}}
   }
   if (isAnyViewerTeamLocked) {
-    segmentIo.track({
-      userId: viewerId,
-      event: 'Locked user attempted to join a team',
-      properties: {invitingOrgId: orgId}
-    })
+    analytics.lockedUserAttemptToJoinTeam(viewer, orgId)
     return {
       error: {
         message: LOCKED_MESSAGE.TEAM_INVITE
@@ -91,7 +94,7 @@ const acceptTeamInvitation: MutationResolvers['acceptTeamInvitation'] = async (
     viewerId,
     dataLoader
   )
-  activatePrevSlackAuth(viewerId, teamId)
+  activatePrevSlackAuth(viewerId, teamId, dataLoader)
   await redisLock.unlock()
   const tms = authToken.tms ? authToken.tms.concat(teamId) : [teamId]
   // IMPORTANT! mutate the current authToken so any queries or subscriptions can get the latest
@@ -125,7 +128,13 @@ const acceptTeamInvitation: MutationResolvers['acceptTeamInvitation'] = async (
   publish(SubscriptionChannel.TEAM, teamId, 'AcceptTeamInvitationPayload', data, subOptions)
 
   // Send individualized message to the user
-  publish(SubscriptionChannel.TEAM, viewerId, 'AcceptTeamInvitationPayload', data, subOptions)
+  publish(
+    SubscriptionChannel.NOTIFICATION,
+    viewerId,
+    'AcceptTeamInvitationPayload',
+    data,
+    subOptions
+  )
 
   // Give the team lead new suggested actions
   if (teamLeadUserIdWithNewActions) {
@@ -134,12 +143,12 @@ const acceptTeamInvitation: MutationResolvers['acceptTeamInvitation'] = async (
       SubscriptionChannel.NOTIFICATION,
       teamLeadUserIdWithNewActions,
       'AcceptTeamInvitationPayload',
-      {teamLeadId: teamLeadUserIdWithNewActions},
+      {...data, teamLeadId: teamLeadUserIdWithNewActions},
       subOptions
     )
   }
   const isNewUser = viewer.createdAt.getDate() === viewer.lastSeenAt.getDate()
-  analytics.inviteAccepted(viewerId, teamId, inviterId, isNewUser, acceptAt)
+  analytics.inviteAccepted(viewer, inviter, teamId, isNewUser, acceptAt)
   return {
     ...data,
     authToken: encodedAuthToken

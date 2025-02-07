@@ -1,19 +1,16 @@
 import styled from '@emotion/styled'
-import graphql from 'babel-plugin-relay/macro'
-import React from 'react'
-import {useFragment} from 'react-relay'
+import clsx from 'clsx'
 import EditableText from '../../../components/EditableText'
 import useAtmosphere from '../../../hooks/useAtmosphere'
 import useMutationProps from '../../../hooks/useMutationProps'
 import RenameMeetingTemplateMutation from '../../../mutations/RenameMeetingTemplateMutation'
 import Legitity from '../../../validation/Legitity'
-import {EditableTemplateName_teamTemplates$key} from '../../../__generated__/EditableTemplateName_teamTemplates.graphql'
 
 interface Props {
   name: string
   templateId: string
-  teamTemplates: EditableTemplateName_teamTemplates$key
   isOwner: boolean
+  className?: string
 }
 
 const InheritedStyles = styled('div')({
@@ -23,23 +20,11 @@ const InheritedStyles = styled('div')({
   lineHeight: '24px'
 })
 
-const StyledEditableText = styled(EditableText)({
-  lineHeight: '24px'
-})
 const EditableTemplateName = (props: Props) => {
-  const {name, templateId, teamTemplates: teamTemplatesRef, isOwner} = props
-  const teamTemplates = useFragment(
-    graphql`
-      fragment EditableTemplateName_teamTemplates on MeetingTemplate @relay(plural: true) {
-        id
-        name
-      }
-    `,
-    teamTemplatesRef
-  )
+  const {name, templateId, isOwner, className} = props
   const atmosphere = useAtmosphere()
   const {onError, error, onCompleted, submitMutation, submitting} = useMutationProps()
-  const autoFocus = name === '*New Template' || name.endsWith(' Copy')
+  const autoFocus = name.startsWith('*New Template') || name.endsWith(' Copy')
 
   const handleSubmit = (rawName: string) => {
     if (submitting) return
@@ -54,13 +39,6 @@ const EditableTemplateName = (props: Props) => {
       .trim()
       .required('Please enter a template name')
       .max(100, 'That name is probably long enough')
-      .test((mVal) => {
-        const isDupe = teamTemplates.find(
-          (template) =>
-            template.id !== templateId && template.name.toLowerCase() === mVal.toLowerCase()
-        )
-        return isDupe ? 'That name is taken' : undefined
-      })
   }
 
   const validate = (rawValue: string) => {
@@ -75,16 +53,18 @@ const EditableTemplateName = (props: Props) => {
 
   return (
     <InheritedStyles>
-      <StyledEditableText
-        autoFocus={autoFocus}
-        disabled={!isOwner}
-        error={error ? error.message : undefined}
-        handleSubmit={handleSubmit}
-        initialValue={name}
-        maxLength={100}
-        validate={validate}
-        placeholder={'*New Template'}
-      />
+      <div className={clsx('leading-6', className)}>
+        <EditableText
+          autoFocus={autoFocus}
+          disabled={!isOwner}
+          error={error ? error.message : undefined}
+          handleSubmit={handleSubmit}
+          initialValue={name}
+          maxLength={100}
+          validate={validate}
+          placeholder={'*New Template'}
+        />
+      </div>
     </InheritedStyles>
   )
 }

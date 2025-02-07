@@ -1,14 +1,14 @@
 import graphql from 'babel-plugin-relay/macro'
-import React, {Fragment} from 'react'
+import {Fragment} from 'react'
 import {useFragment} from 'react-relay'
-import useAtmosphere from '../hooks/useAtmosphere'
-import useGotoStageId from '../hooks/useGotoStageId'
-import getSidebarItemStage from '../utils/getSidebarItemStage'
-import findStageById from '../utils/meetings/findStageById'
 import {
   ActionMeetingSidebar_meeting$key,
   NewMeetingPhaseTypeEnum
 } from '../__generated__/ActionMeetingSidebar_meeting.graphql'
+import useAtmosphere from '../hooks/useAtmosphere'
+import useGotoStageId from '../hooks/useGotoStageId'
+import getSidebarItemStage from '../utils/getSidebarItemStage'
+import findStageById from '../utils/meetings/findStageById'
 import ActionSidebarPhaseListItemChildren from './ActionSidebarPhaseListItemChildren'
 import MeetingNavList from './MeetingNavList'
 import NewMeetingSidebar from './NewMeetingSidebar'
@@ -31,9 +31,6 @@ const ActionMeetingSidebar = (props: Props) => {
       fragment ActionMeetingSidebar_meeting on ActionMeeting {
         ...ActionSidebarPhaseListItemChildren_meeting
         ...NewMeetingSidebar_meeting
-        settings {
-          phaseTypes
-        }
         facilitatorUserId
         facilitatorStageId
         localPhase {
@@ -62,9 +59,8 @@ const ActionMeetingSidebar = (props: Props) => {
   )
   const atmosphere = useAtmosphere()
   const {viewerId} = atmosphere
-  const {team, settings} = meeting
+  const {team} = meeting
   const {agendaItems} = team
-  const {phaseTypes} = settings
   const {facilitatorUserId, facilitatorStageId, localPhase, localStage, phases} = meeting
   const localPhaseType = localPhase ? localPhase.phaseType : ''
   const facilitatorStageRes = findStageById(phases, facilitatorStageId)
@@ -79,9 +75,9 @@ const ActionMeetingSidebar = (props: Props) => {
       meeting={meeting}
     >
       <MeetingNavList>
-        {phaseTypes
-          .filter((phaseType) => !blackList.includes(phaseType))
-          .map((phaseType) => {
+        {phases
+          .filter(({phaseType}) => !blackList.includes(phaseType))
+          .map(({phaseType}) => {
             const itemStage = getSidebarItemStage(phaseType, phases, facilitatorStageId)
             const {
               id: itemStageId = '',
@@ -90,7 +86,9 @@ const ActionMeetingSidebar = (props: Props) => {
             } = itemStage || {}
             const canNavigate = isViewerFacilitator ? isNavigableByFacilitator : isNavigable
             const handleClick = () => {
-              gotoStageId(itemStageId).catch()
+              gotoStageId(itemStageId).catch(() => {
+                /*ignore*/
+              })
               handleMenuClick()
             }
             const phaseCount =
